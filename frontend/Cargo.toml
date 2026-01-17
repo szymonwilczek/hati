@@ -1,0 +1,17 @@
+[package]
+name = "hati"
+version = "0.1.0"
+edition = "2021"
+authors = ["Szymon Wilczek"]
+description = "Professional cursor highlighter for GNOME/Wayland"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+gtk4 = { version = "0.9", features = ["v4_10"] }
+libadwaita = { version = "0.7", features = ["v1_5"] }
+glib = "0.20"
+gio = "0.20"
+
+[[bin]]
+name = "hati"
+path = "src/main.rs"
