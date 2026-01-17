@@ -14,14 +14,24 @@ export default class HatiExtension extends Extension {
   constructor(metadata) {
     super(metadata);
     this._highlightActor = null;
+    this._shaderEffect = null;
     this._updateId = null;
     this._settings = null;
+    this._settingsChangedId = null;
   }
 
   enable() {
     console.log("[Hati] Enabling cursor highlighter...");
 
     this._settings = this.getSettings("org.hati.Highlighter");
+
+    // watch for settings changes
+    this._settingsChangedId = this._settings.connect(
+      "changed",
+      (settings, key) => {
+        this._onSettingsChanged(key);
+      },
+    );
 
     // only proceed if enabled
     if (!this._settings.get_boolean("enabled")) {
@@ -43,6 +53,10 @@ export default class HatiExtension extends Extension {
 
     // cleanup settings
     if (this._settings) {
+      if (this._settingsChangedId) {
+        this._settings.disconnect(this._settingsChangedId);
+        this._settingsChangedId = null;
+      }
       this._settings = null;
     }
 
@@ -161,6 +175,102 @@ export default class HatiExtension extends Extension {
 
     // update actor position
     this._highlightActor.set_position(centerX, centerY);
+  }
+
+  _onSettingsChanged(key) {
+    console.log(`[Hati] Setting changed: ${key}`);
+
+    switch (key) {
+      case "enabled":
+        if (this._settings.get_boolean("enabled")) {
+          // re-enable highlight
+          if (!this._highlightActor) {
+            this._createHighlightActor();
+            this._startCursorTracking();
+          }
+        } else {
+          // disable highlight
+          this._stopCursorTracking();
+          this._destroyHighlightActor();
+        }
+        break;
+
+      case "color":
+        this._updateShaderColor();
+        break;
+
+      case "size":
+        this._updateActorSize();
+        break;
+
+      case "opacity":
+        this._updateActorOpacity();
+        break;
+
+      case "border-weight":
+        this._updateShaderBorderWeight();
+        break;
+
+      case "glow":
+        this._updateShaderGlow();
+        break;
+
+      case "shape":
+        this._updateShaderShape();
+        break;
+    }
+  }
+
+  _updateShaderColor() {
+    if (!this._shaderEffect) return;
+
+    const color = this._parseColor(this._settings.get_string("color"));
+    this._shaderEffect.set_uniform_value("u_color", [
+      color.red / 255.0,
+      color.green / 255.0,
+      color.blue / 255.0,
+      color.alpha,
+    ]);
+  }
+
+  _updateActorSize() {
+    if (!this._highlightActor) return;
+
+    const size = this._settings.get_int("size");
+    this._highlightActor.set_size(size, size);
+
+    // update shader resolution uniform
+    if (this._shaderEffect) {
+      this._shaderEffect.set_uniform_value("u_resolution", [size, size]);
+    }
+  }
+
+  _updateActorOpacity() {
+    if (!this._highlightActor) return;
+
+    const opacity = this._settings.get_double("opacity");
+    this._highlightActor.set_opacity(Math.floor(opacity * 255));
+  }
+
+  _updateShaderBorderWeight() {
+    if (!this._shaderEffect) return;
+
+    const borderWeight = this._settings.get_int("border-weight");
+    this._shaderEffect.set_uniform_value("u_border_weight", borderWeight);
+  }
+
+  _updateShaderGlow() {
+    if (!this._shaderEffect) return;
+
+    const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
+    this._shaderEffect.set_uniform_value("u_glow", glow);
+  }
+
+  _updateShaderShape() {
+    if (!this._shaderEffect) return;
+
+    const shape = this._getShapeValue(this._settings.get_string("shape"));
+    this._shaderEffect.set_uniform_value("u_shape", shape);
   }
 
   _getShapeValue(shapeString) {
