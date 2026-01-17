@@ -76,9 +76,8 @@ export default class HatiExtension extends Extension {
     const borderWeight = this._settings.get_int("border-weight");
     const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
     const shape = this._getShapeValue(this._settings.get_string("shape"));
-    // EMERGENCY FALLBACK: St.Bin + OffscreenRedirect.ALWAYS
-    // This is the ONLY configuration proved to be visible (Step 534).
-    // UVs are broken, so we will use gl_FragCoord with Screen Height correction.
+    // NUCLEAR OPTION: Pure CSS Actor. No Shaders. No Redirects.
+    // We strictly need to verify that the actor can be seen on screen.
     this._highlightActor = new St.Bin({
       style_class: "hati-highlight",
       width: size,
@@ -88,67 +87,33 @@ export default class HatiExtension extends Extension {
       can_focus: false,
     });
 
-    // Valid background to ensure painting
-    // DEBUG: RED background. If you see this, the shader is NOT running.
-    // If you see the shader output, this is overwritten.
     this._highlightActor.set_style(`
-      background-color: rgb(100, 0, 0); 
+      background-color: red;
+      border: 2px solid white;
       border-radius: 999px;
     `);
 
-    // Mandatory for GNOME 49 visibility
-    this._highlightActor.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
-
-    // Load and apply GLSL shader
-    try {
-      const shaderPath = this.path + "/shaders/highlight.glsl";
-      const shaderSource = Shell.get_file_contents_utf8_sync(shaderPath);
-
-      const shaderEffect = new Clutter.ShaderEffect();
-
-      shaderEffect.set_shader_source(shaderSource);
-
-      // set shader uniforms
-      shaderEffect.set_uniform_value("u_r", color.red / 255.0);
-      shaderEffect.set_uniform_value("u_g", color.green / 255.0);
-      shaderEffect.set_uniform_value("u_b", color.blue / 255.0);
-      shaderEffect.set_uniform_value("u_alpha", color.alpha);
-
-      shaderEffect.set_uniform_value("u_border_weight", borderWeight);
-      shaderEffect.set_uniform_value("u_glow", glow);
-      shaderEffect.set_uniform_value("u_shape", shape);
-
-      shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
-      shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
-
-      // Screen Space Uniforms
-      shaderEffect.set_uniform_value("u_pos_x", 0.0);
-      shaderEffect.set_uniform_value("u_pos_y", 0.0);
-      shaderEffect.set_uniform_value("u_root_height", parseFloat(Main.layoutManager.primaryMonitor.height));
-
-      this._highlightActor.add_effect(shaderEffect);
-      this._shaderEffect = shaderEffect; // store for later updates
-
-      console.log("[Hati] Shader applied successfully (St.DrawingArea + PM Alpha)");
-    } catch (e) {
-      console.error("[Hati] Failed to load shader:", e);
-    }
+    // No Effects. No Redirects. Just a red box.
+    // This MUST be visible.
 
     // Add to the UI group (above windows, below UI)
     Main.uiGroup.add_child(this._highlightActor);
 
-    // Force a redraw to ensure the texture is generated initially
-    this._highlightActor.queue_repaint();
-
-    console.log("[Hati] Highlight actor created");
+    console.log("[Hati] Highlight actor created (CSS Only Mode)");
   }
 
-  _destroyHighlightActor() {
+  _removeHighlightActor() {
     if (this._highlightActor) {
+      if (this._trackingId) {
+        this._highlightActor.remove_effect(this._trackingId);
+        this._trackingId = null;
+      }
+
       Main.uiGroup.remove_child(this._highlightActor);
       this._highlightActor.destroy();
       this._highlightActor = null;
-      console.log("[Hati] Highlight actor destroyed");
+      this._shaderEffect = null;
+      this._content = null;
     }
   }
 
@@ -175,106 +140,50 @@ export default class HatiExtension extends Extension {
   }
 
   _updateHighlightPosition() {
-    if (!this._highlightActor) {
-      return;
-    }
+    if (!this._highlightActor) return;
 
-    // get global pointer position
     const [x, y] = global.get_pointer();
-
-    // center the highlight on cursor
     const size = this._settings.get_int("size");
     const centerX = x - size / 2;
     const centerY = y - size / 2;
 
     // update actor position
     this._highlightActor.set_position(centerX, centerY);
-
-    // Update Shader Uniforms for FragCoord Calculation
-    if (this._shaderEffect) {
-      this._shaderEffect.set_uniform_value("u_pos_x", centerX);
-      this._shaderEffect.set_uniform_value("u_pos_y", centerY);
-      // Ensure root height is correct (in case of changes, though unlikely for cursor loop)
-      // Optimization: only update if needed? For now, safety first.
-      this._shaderEffect.set_uniform_value("u_root_height", parseFloat(Main.layoutManager.primaryMonitor.height));
-    }
   }
 
   _onSettingsChanged(key) {
-    console.log(`[Hati] Setting changed: ${key}`);
-
-    switch (key) {
-      case "enabled":
-        if (this._settings.get_boolean("enabled")) {
-          // re-enable highlight
-          if (!this._highlightActor) {
-            this._createHighlightActor();
-            this._startCursorTracking();
-          }
-        } else {
-          // disable highlight
-          this._stopCursorTracking();
-          this._destroyHighlightActor();
-        }
-        break;
-
-      case "color":
-        this._updateShaderColor();
-        break;
-
-      case "size":
-        this._updateActorSize();
-        break;
-
-      case "opacity":
-        this._updateActorOpacity();
-        break;
-
-      case "border-weight":
-        this._updateShaderBorderWeight();
-        break;
-
-      case "glow":
-        this._updateShaderGlow();
-        break;
-
-      case "shape":
-        this._updateShaderShape();
-        break;
+    if (key === "enabled") {
+      this._toggleHighlight();
+    } else {
+      this._refreshStyle();
     }
   }
 
-  _updateShaderColor() {
-    if (!this._shaderEffect) return;
-
-    const color = this._parseColor(this._settings.get_string("color"));
-    this._shaderEffect.set_uniform_value("u_r", color.red / 255.0);
-    this._shaderEffect.set_uniform_value("u_g", color.green / 255.0);
-    this._shaderEffect.set_uniform_value("u_b", color.blue / 255.0);
-    this._shaderEffect.set_uniform_value("u_alpha", color.alpha);
-  }
-
-  _updateActorSize() {
+  _refreshStyle() {
     if (!this._highlightActor) return;
 
+    // Simple CSS refresh
     const size = this._settings.get_int("size");
+    const color = this._parseColor(this._settings.get_string("color"));
+    const borderWeight = this._settings.get_int("border-weight");
+    const opacity = this._settings.get_double("opacity");
+
     this._highlightActor.set_size(size, size);
+    this._highlightActor.set_style(`
+       background-color: rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha});
+       border: ${borderWeight}px solid white;
+       border-radius: ${size}px;
+    `);
 
-    // update shader resolution uniform
-    if (this._shaderEffect) {
-      this._shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
-      this._shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
-    }
-
-    // Queue repaint to update Cairo surface size
-    this._highlightActor.queue_repaint();
+    this._highlightActor.set_opacity(Math.floor(opacity * 255));
   }
 
   _updateActorOpacity() {
-    if (!this._highlightActor) return;
+    // Managed by refreshStyle
+  }
 
-    const opacity = this._settings.get_double("opacity");
-    this._highlightActor.set_opacity(Math.floor(opacity * 255));
+  _updateActorSize() {
+    // Managed by refreshStyle
   }
 
   _updateShaderBorderWeight() {
