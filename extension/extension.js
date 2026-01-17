@@ -58,26 +58,56 @@ export default class HatiExtension extends Extension {
     const size = this._settings.get_int("size");
     const color = this._parseColor(this._settings.get_string("color"));
     const opacity = this._settings.get_double("opacity");
+    const borderWeight = this._settings.get_int("border-weight");
+    const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
+    const shape = this._getShapeValue(this._settings.get_string("shape"));
 
-    // simple circular actor (for now, without shader)
-    this._highlightActor = new St.Bin({
-      style_class: "hati-highlight",
+    this._highlightActor = new Clutter.Actor({
       width: size,
       height: size,
       opacity: Math.floor(opacity * 255),
       reactive: false,
-      can_focus: false,
     });
 
-    // styling
-    const borderWeight = this._settings.get_int("border-weight");
-    const colorStr = `rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha})`;
+    // load and apply GLSL shader
+    try {
+      const shaderPath = this.path + "/shaders/highlight.glsl";
+      const shaderSource = Shell.get_file_contents_utf8_sync(shaderPath);
 
-    this._highlightActor.set_style(`
-            border: ${borderWeight}px solid ${colorStr};
-            border-radius: ${size / 2}px;
-            background-color: transparent;
-        `);
+      const shaderEffect = new Clutter.ShaderEffect({
+        shader_type: Clutter.ShaderType.FRAGMENT_SHADER,
+      });
+
+      shaderEffect.set_shader_source(shaderSource);
+
+      // set shader uniforms
+      shaderEffect.set_uniform_value("u_color", [
+        color.red / 255.0,
+        color.green / 255.0,
+        color.blue / 255.0,
+        color.alpha,
+      ]);
+      shaderEffect.set_uniform_value("u_border_weight", borderWeight);
+      shaderEffect.set_uniform_value("u_glow", glow);
+      shaderEffect.set_uniform_value("u_shape", shape);
+      shaderEffect.set_uniform_value("u_resolution", [size, size]);
+
+      this._highlightActor.add_effect(shaderEffect);
+      this._shaderEffect = shaderEffect; // store for later updates
+
+      console.log("[Hati] Shader applied successfully");
+    } catch (e) {
+      console.error("[Hati] Failed to load shader:", e);
+      // fallback to simple painted actor
+      this._highlightActor.set_background_color(
+        new Clutter.Color({
+          red: color.red,
+          green: color.green,
+          blue: color.blue,
+          alpha: Math.floor(color.alpha * 255),
+        }),
+      );
+    }
 
     // add to the UI group (above windows, below UI)
     Main.uiGroup.add_child(this._highlightActor);
@@ -131,6 +161,20 @@ export default class HatiExtension extends Extension {
 
     // update actor position
     this._highlightActor.set_position(centerX, centerY);
+  }
+
+  _getShapeValue(shapeString) {
+    // convert shape name to numeric value for shader
+    switch (shapeString) {
+      case "circle":
+        return 0.0;
+      case "squircle":
+        return 1.0;
+      case "square":
+        return 2.0;
+      default:
+        return 0.0; // default to circle
+    }
   }
 
   _parseColor(colorString) {
