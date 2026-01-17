@@ -76,36 +76,52 @@ export default class HatiExtension extends Extension {
     const borderWeight = this._settings.get_int("border-weight");
     const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
     const shape = this._getShapeValue(this._settings.get_string("shape"));
-    // CSS-Based Highlight Actor
-    // ShaderEffect is unreliable on GNOME 49 (invisibility).
-    // We use standard St/CSS properties to achieve the ring/glow effect.
+    // CONTAINER STRATEGY:
+    // To prevent "trail/smear" artifacts on Wayland, we must ensure the actor's paint volume
+    // fully encloses the CSS box-shadow.
+    // We create a larger transparent container and place the styled actor inside it.
+
+    // 1. Container Actor (The one we move)
+    this._containerActor = new St.Bin({
+      style_class: "hati-container",
+      reactive: false,
+      can_focus: false,
+      x_align: Clutter.ActorAlign.CENTER,
+      y_align: Clutter.ActorAlign.CENTER,
+    });
+
+    // 2. Inner Highlight Actor (The visible ring/glow)
     this._highlightActor = new St.Bin({
       style_class: "hati-highlight",
-      width: size,
-      height: size,
-      opacity: Math.floor(opacity * 255),
       reactive: false,
       can_focus: false,
     });
 
+    this._containerActor.set_child(this._highlightActor);
+
     // Initial Style
     this._refreshStyle();
 
-    // Add to the UI group (above windows, below UI)
-    Main.uiGroup.add_child(this._highlightActor);
+    // Add Container to UI Group
+    Main.uiGroup.add_child(this._containerActor);
 
-    console.log("[Hati] Highlight actor created (Pure CSS Mode)");
+    // Optional: Force OffscreenRedirect on Container IF artifacts persist.
+    // For now, the larger size should be enough.
+    // this._containerActor.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
+
+    console.log("[Hati] Highlight actor created (Container + CSS Mode)");
   }
 
   _removeHighlightActor() {
-    if (this._highlightActor) {
+    if (this._containerActor) {
       if (this._trackingId) {
-        this._highlightActor.remove_effect(this._trackingId);
+        this._containerActor.remove_effect(this._trackingId);
         this._trackingId = null;
       }
 
-      Main.uiGroup.remove_child(this._highlightActor);
-      this._highlightActor.destroy();
+      Main.uiGroup.remove_child(this._containerActor);
+      this._containerActor.destroy();
+      this._containerActor = null;
       this._highlightActor = null;
     }
   }
@@ -133,15 +149,20 @@ export default class HatiExtension extends Extension {
   }
 
   _updateHighlightPosition() {
-    if (!this._highlightActor) return;
+    if (!this._containerActor) return;
 
     const [x, y] = global.get_pointer();
-    const size = this._settings.get_int("size");
-    const centerX = x - size / 2;
-    const centerY = y - size / 2;
+    // Container is larger, but we want to center the VISUAL part on the cursor.
+    // Since Inner is centered in Container, we just center Container on cursor.
 
-    // update actor position
-    this._highlightActor.set_position(centerX, centerY);
+    // Effectively: Center of Container == Cursor.
+    const containerWidth = this._containerActor.get_width();
+    const containerHeight = this._containerActor.get_height();
+
+    const centerX = x - containerWidth / 2;
+    const centerY = y - containerHeight / 2;
+
+    this._containerActor.set_position(centerX, centerY);
   }
 
   _onSettingsChanged(key) {
@@ -149,13 +170,11 @@ export default class HatiExtension extends Extension {
       this._toggleHighlight();
       return;
     }
-
-    // Update CSS
     this._refreshStyle();
   }
 
   _refreshStyle() {
-    if (!this._highlightActor) return;
+    if (!this._highlightActor || !this._containerActor) return;
 
     // Fetch Settings
     const size = this._settings.get_int("size");
@@ -163,41 +182,45 @@ export default class HatiExtension extends Extension {
     const color = this._parseColor(colorStr);
     const borderWeight = this._settings.get_int("border-weight");
     const opacity = this._settings.get_double("opacity");
-    const shapeStr = this._settings.get_string("shape"); // circle, square, squircle
+    const shapeStr = this._settings.get_string("shape");
     const glow = this._settings.get_boolean("glow");
 
-    // Map Shape to Border Radius
+    // Logic: Shape
     let radius = "0px";
     if (shapeStr === "circle") {
-      radius = "50%"; // Perfect circle
+      radius = "50%";
     } else if (shapeStr === "squircle") {
-      radius = "25%"; // Approximate squircle
-    } else {
-      radius = "0px"; // Square
+      radius = "25%";
     }
 
-    // Map Glow to Box Shadow
-    // box-shadow: x y blur spread color
-    // We use a simplified glow if enabled
+    // Logic: Glow
     let shadow = "none";
+    let padding = 0;
+
     if (glow) {
-      // Use the same color as border but maybe more transparent?
-      // Or just the same color.
-      shadow = `0 0 10px 2px rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha})`;
+      // Robust Glow: large blur radius
+      shadow = `0 0 20px 5px rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha})`;
+      padding = 50; // Extra space for glow
+    } else {
+      padding = 10; // Basic anti-aliasing margin
     }
 
+    // 1. Style the Inner Actor (Visuals)
     this._highlightActor.set_size(size, size);
-    this._highlightActor.set_opacity(Math.floor(opacity * 255));
-
-    // Construct CSS String
-    // Note: We use transparent background to see through the ring.
-    // Ideally we want the border to define the shape.
     this._highlightActor.set_style(`
        background-color: transparent;
        border: ${borderWeight}px solid rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha});
        border-radius: ${radius};
        box-shadow: ${shadow};
     `);
+
+    // 2. Size the Container (Geometry)
+    // Container must be larger than Inner + Shadow
+    const totalSize = size + (padding * 2);
+    this._containerActor.set_size(totalSize, totalSize);
+
+    // 3. Opacity (applied to container to affect both)
+    this._containerActor.set_opacity(Math.floor(opacity * 255));
   }
 
   _updateActorOpacity() {
