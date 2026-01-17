@@ -4,7 +4,8 @@ EXTENSION_UUID = [email protected]
 EXTENSION_DIR = extension
 FRONTEND_DIR = frontend
 REMOTE_HOST = wolfie@dionisus.local
-REMOTE_EXT_DIR = ~/.local/share/gnome-shell/extensions/$(EXTENSION_UUID)
+REMOTE_EXT_DIR = .local/share/gnome-shell/extensions/$(EXTENSION_UUID)
+
 
 all: install-extension build-frontend
 
@@ -19,10 +20,11 @@ install-extension:
 # remote deployment (for testing on dionisus.local)
 deploy-remote:
 	@echo "🚀 Deploying extension to $(REMOTE_HOST)..."
-	@ssh $(REMOTE_HOST) "mkdir -p $(REMOTE_EXT_DIR)"
-	@scp -r $(EXTENSION_DIR)/* $(REMOTE_HOST):$(REMOTE_EXT_DIR)/
-	@ssh $(REMOTE_HOST) "glib-compile-schemas $(REMOTE_EXT_DIR)/schemas/"
+	@ssh $(REMOTE_HOST) "mkdir -p '$(REMOTE_EXT_DIR)'"
+	@scp -r $(EXTENSION_DIR)/* $(REMOTE_HOST):"$(REMOTE_EXT_DIR)/"
+	@ssh $(REMOTE_HOST) "glib-compile-schemas '$(REMOTE_EXT_DIR)/schemas/'"
 	@echo "✅ Extension deployed to remote host. Logout/login on dionisus to apply."
+
 
 # frontend targets
 build-frontend:
