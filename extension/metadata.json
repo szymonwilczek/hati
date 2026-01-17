@@ -1,0 +1,12 @@
+{
+  "name": "Hati Cursor Highlighter",
+  "description": "Professional cursor highlighting for presentations and screen recording.",
+  "uuid": "[email protected]",
+  "shell-version": [
+    "48",
+    "49"
+  ],
+  "version": 1,
+  "url": "https://github.com/szymonwilczek/hati",
+  "settings-schema": "org.hati.Highlighter"
+}
