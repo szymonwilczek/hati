@@ -85,8 +85,12 @@ export default class HatiExtension extends Extension {
       can_focus: false,
     });
 
-    // force a background color so Clutter paints something
-    // DEBUG: Green box with red border
+    // CRITICAL: Force offscreen redirection to solve transparency artifacts on Wayland
+    // This creates a separate buffer for the actor which is cleared every frame
+    this._highlightActor.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
+
+    // DEBUG MODE: Green box with red border + Offscreen Redirect
+    // Testing if Redirect itself is the cause of invisibility
     this._highlightActor.set_style(`
       background-color: rgba(0, 255, 0, 0.5); 
       border: 4px solid red;
@@ -95,7 +99,7 @@ export default class HatiExtension extends Extension {
 
     // SHADER DISABLED FOR DEBUGGING
     /*
-    // load and apply GLSL shader
+    // Load and apply GLSL shader
     try {
       const shaderPath = this.path + "/shaders/highlight.glsl";
       const shaderSource = Shell.get_file_contents_utf8_sync(shaderPath);
@@ -120,7 +124,7 @@ export default class HatiExtension extends Extension {
       this._highlightActor.add_effect(shaderEffect);
       this._shaderEffect = shaderEffect; // store for later updates
       
-      console.log("[Hati] Shader applied successfully");
+      console.log("[Hati] Shader applied successfully with Offscreen Redirect");
     } catch (e) {
       console.error("[Hati] Failed to load shader:", e);
       // fallback to simple painted actor
@@ -135,10 +139,10 @@ export default class HatiExtension extends Extension {
     }
     */
 
-    // UI group (above windows, below UI)
+    // Add to the UI group (above windows, below UI)
     Main.uiGroup.add_child(this._highlightActor);
 
-    console.log("[Hati] Highlight actor created (Debug Mode)");
+    console.log("[Hati] Highlight actor created (Debug: Green Box + Redirect)");
   }
 
   _destroyHighlightActor() {
