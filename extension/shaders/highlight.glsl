@@ -1,16 +1,24 @@
 // highlight.glsl - GLSL Fragment Shader for Hati Cursor Highlight
 // renders a smooth, anti-aliased circle/ring with optional glow effect
 
-uniform vec4 u_color;           // RGBA color of the highlight
+uniform float u_r;              // red component (0.0 - 1.0)
+uniform float u_g;              // green component (0.0 - 1.0)
+uniform float u_b;              // blue component (0.0 - 1.0)
+uniform float u_alpha;          // alpha component (0.0 - 1.0)
 uniform float u_border_weight;  // thickness of the ring border (in pixels)
 uniform float u_glow;           // glow intensity (0.0 = no glow, 1.0 = max glow)
 uniform float u_shape;          // shape parameter (0=circle, 1=squircle, 2=square)
-uniform vec2 u_resolution;      // actor size in pixels
+uniform float u_res_x;          // actor width
+uniform float u_res_y;          // actor height
 
-// Input from vertex shader
+// input from vertex shader
 varying vec2 cogl_tex_coord_in[1];
 
 void main() {
+    // color and resolution vectors to keep logic cleaner
+    vec4 u_color = vec4(u_r, u_g, u_b, u_alpha);
+    vec2 u_resolution = vec2(u_res_x, u_res_y);
+    
     // normalized coordinates (0.0 to 1.0)
     vec2 uv = cogl_tex_coord_in[0].st;
     

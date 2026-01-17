@@ -88,23 +88,22 @@ export default class HatiExtension extends Extension {
       const shaderPath = this.path + "/shaders/highlight.glsl";
       const shaderSource = Shell.get_file_contents_utf8_sync(shaderPath);
 
-      const shaderEffect = new Clutter.ShaderEffect({
-        shader_type: Clutter.ShaderType.FRAGMENT_SHADER,
-      });
+      const shaderEffect = new Clutter.ShaderEffect();
 
       shaderEffect.set_shader_source(shaderSource);
 
       // set shader uniforms
-      shaderEffect.set_uniform_value("u_color", [
-        color.red / 255.0,
-        color.green / 255.0,
-        color.blue / 255.0,
-        color.alpha,
-      ]);
+      shaderEffect.set_uniform_value("u_r", color.red / 255.0);
+      shaderEffect.set_uniform_value("u_g", color.green / 255.0);
+      shaderEffect.set_uniform_value("u_b", color.blue / 255.0);
+      shaderEffect.set_uniform_value("u_alpha", color.alpha);
+
       shaderEffect.set_uniform_value("u_border_weight", borderWeight);
       shaderEffect.set_uniform_value("u_glow", glow);
       shaderEffect.set_uniform_value("u_shape", shape);
-      shaderEffect.set_uniform_value("u_resolution", [size, size]);
+
+      shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
+      shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
 
       this._highlightActor.add_effect(shaderEffect);
       this._shaderEffect = shaderEffect; // store for later updates
@@ -225,12 +224,10 @@ export default class HatiExtension extends Extension {
     if (!this._shaderEffect) return;
 
     const color = this._parseColor(this._settings.get_string("color"));
-    this._shaderEffect.set_uniform_value("u_color", [
-      color.red / 255.0,
-      color.green / 255.0,
-      color.blue / 255.0,
-      color.alpha,
-    ]);
+    this._shaderEffect.set_uniform_value("u_r", color.red / 255.0);
+    this._shaderEffect.set_uniform_value("u_g", color.green / 255.0);
+    this._shaderEffect.set_uniform_value("u_b", color.blue / 255.0);
+    this._shaderEffect.set_uniform_value("u_alpha", color.alpha);
   }
 
   _updateActorSize() {
@@ -241,7 +238,8 @@ export default class HatiExtension extends Extension {
 
     // update shader resolution uniform
     if (this._shaderEffect) {
-      this._shaderEffect.set_uniform_value("u_resolution", [size, size]);
+      this._shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
+      this._shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
     }
   }
 
