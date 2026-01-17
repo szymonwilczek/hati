@@ -70,6 +70,20 @@
       <summary>Auto-hide delay</summary>
       <description>Time in milliseconds before hiding stationary cursor</description>
     </key>
+
+    <key name="inertia-stiffness" type="d">
+      <range min="0.01" max="1.0"/>
+      <default>0.12</default>
+      <summary>Inertia Stiffness</summary>
+      <description>Spring stiffness (Higher = Faster/Tighter follow)</description>
+    </key>
+
+    <key name="inertia-smoothness" type="d">
+      <range min="0.1" max="0.99"/>
+      <default>0.65</default>
+      <summary>Inertia Smoothness</summary>
+      <description>Velocity retention factor (Higher = More slippery/gliding, Lower = High friction)</description>
+    </key>
     
   </schema>
 </schemalist>

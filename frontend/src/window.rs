@@ -186,6 +186,50 @@ impl HatiWindow {
 
         page.add(&border_group);
 
+        let physics_group = adw::PreferencesGroup::builder()
+            .title("Physics")
+            .build();
+
+        // Stiffness
+        let stiffness_row = adw::SpinRow::builder()
+            .title("Stiffness (Speed)")
+            .subtitle("How fast the cursor catches up")
+            .adjustment(&gtk4::Adjustment::new(
+                settings.double("inertia-stiffness"),
+                0.01,
+                1.0,
+                0.01,
+                0.1,
+                0.0,
+            ))
+            .digits(2)
+            .build();
+        stiffness_row.connect_changed(clone!(@weak settings => move |row| {
+             settings.set_double("inertia-stiffness", row.value()).unwrap();
+        }));
+        physics_group.add(&stiffness_row);
+
+        // Smoothness
+        let smoothness_row = adw::SpinRow::builder()
+            .title("Smoothness (Friction)")
+            .subtitle("Higher = More slippery, Lower = More friction")
+            .adjustment(&gtk4::Adjustment::new(
+                settings.double("inertia-smoothness"),
+                0.1,
+                0.99,
+                0.01,
+                0.1,
+                0.0,
+            ))
+            .digits(2)
+            .build();
+         smoothness_row.connect_changed(clone!(@weak settings => move |row| {
+             settings.set_double("inertia-smoothness", row.value()).unwrap();
+        }));
+        physics_group.add(&smoothness_row);
+
+        page.add(&physics_group);
+
         let behavior_group = adw::PreferencesGroup::builder()
             .title("Behavior")
             .build();

@@ -106,11 +106,11 @@ export default class HatiExtension extends Extension {
     this._velocityY = 0;
     this._tickId = 0;
 
-    // Physics Constants (Tuned for "Subtle Polish")
-    // Visible Lag (k=0.12) gives a premium "weighty" feel.
-    // Moderate Friction (d=0.65) ensures smooth arrival without oscillation.
+    // Physics Constants (Initialized from Settings)
     this._k = 0.12;
     this._d = 0.65;
+    this._updatePhysicsConstants(); // Load actual values
+
     this._squishDist = 0; // Will be calculated based on size
 
     // Initial Style
@@ -127,6 +127,15 @@ export default class HatiExtension extends Extension {
     });
 
     console.log("[Hati] Highlight actor created (Container + CSS + Physics Mode)");
+  }
+
+  _updatePhysicsConstants() {
+    if (!this._settings) return;
+    this._k = this._settings.get_double("inertia-stiffness");
+    this._d = this._settings.get_double("inertia-smoothness");
+    // Safety Clamp
+    this._d = Math.max(0.01, Math.min(0.99, this._d));
+    // console.log(`[Hati] Physics Updated: k=${this._k}, d=${this._d}`);
   }
 
   _removeHighlightActor() {
@@ -249,6 +258,12 @@ export default class HatiExtension extends Extension {
       this._toggleHighlight();
       return;
     }
+
+    if (key === "inertia-stiffness" || key === "inertia-smoothness") {
+      this._updatePhysicsConstants();
+      return;
+    }
+
     this._refreshStyle();
   }
 
