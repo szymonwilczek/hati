@@ -96,10 +96,48 @@ export default class HatiExtension extends Extension {
     // No Effects. No Redirects. Just a red box.
     // This MUST be visible.
 
+    // Load and apply GLSL shader
+    try {
+      const shaderPath = this.path + "/shaders/highlight.glsl";
+      const shaderSource = Shell.get_file_contents_utf8_sync(shaderPath);
+
+      const shaderEffect = new Clutter.ShaderEffect();
+
+      shaderEffect.set_shader_source(shaderSource);
+
+      // set shader uniforms
+      shaderEffect.set_uniform_value("u_r", color.red / 255.0);
+      shaderEffect.set_uniform_value("u_g", color.green / 255.0);
+      shaderEffect.set_uniform_value("u_b", color.blue / 255.0);
+      shaderEffect.set_uniform_value("u_alpha", color.alpha);
+
+      shaderEffect.set_uniform_value("u_border_weight", borderWeight);
+      shaderEffect.set_uniform_value("u_glow", glow);
+      shaderEffect.set_uniform_value("u_shape", shape);
+
+      shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
+      shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
+
+      // Screen Space Uniforms
+      shaderEffect.set_uniform_value("u_pos_x", 0.0);
+      shaderEffect.set_uniform_value("u_pos_y", 0.0);
+      shaderEffect.set_uniform_value("u_root_height", parseFloat(Main.layoutManager.primaryMonitor.height));
+
+      this._highlightActor.add_effect(shaderEffect);
+      this._shaderEffect = shaderEffect; // store for later updates
+
+      console.log("[Hati] Shader applied successfully to St.Bin");
+    } catch (e) {
+      console.error("[Hati] Failed to load shader:", e);
+    }
+
     // Add to the UI group (above windows, below UI)
     Main.uiGroup.add_child(this._highlightActor);
 
-    console.log("[Hati] Highlight actor created (CSS Only Mode)");
+    // Force a redraw to ensure the texture is generated initially
+    this._highlightActor.queue_repaint();
+
+    console.log("[Hati] Highlight actor created (CSS + Shader Mode)");
   }
 
   _removeHighlightActor() {
@@ -149,13 +187,45 @@ export default class HatiExtension extends Extension {
 
     // update actor position
     this._highlightActor.set_position(centerX, centerY);
+
+    // Update Shader Uniforms for FragCoord Calculation
+    if (this._shaderEffect) {
+      this._shaderEffect.set_uniform_value("u_pos_x", centerX);
+      this._shaderEffect.set_uniform_value("u_pos_y", centerY);
+      this._shaderEffect.set_uniform_value("u_root_height", parseFloat(Main.layoutManager.primaryMonitor.height));
+    }
   }
 
   _onSettingsChanged(key) {
     if (key === "enabled") {
       this._toggleHighlight();
-    } else {
-      this._refreshStyle();
+      return;
+    }
+
+    // Update CSS
+    this._refreshStyle();
+
+    // Update Shader Uniforms
+    if (this._shaderEffect) {
+      const color = this._parseColor(this._settings.get_string("color"));
+      const borderWeight = this._settings.get_int("border-weight");
+      const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
+      const shape = this._getShapeValue(this._settings.get_string("shape"));
+      const size = this._settings.get_int("size");
+
+      this._shaderEffect.set_uniform_value("u_r", color.red / 255.0);
+      this._shaderEffect.set_uniform_value("u_g", color.green / 255.0);
+      this._shaderEffect.set_uniform_value("u_b", color.blue / 255.0);
+      this._shaderEffect.set_uniform_value("u_alpha", color.alpha);
+
+      this._shaderEffect.set_uniform_value("u_border_weight", borderWeight);
+      this._shaderEffect.set_uniform_value("u_glow", glow);
+      this._shaderEffect.set_uniform_value("u_shape", shape);
+
+      if (key === "size") {
+        this._shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
+        this._shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
+      }
     }
   }
 
@@ -169,13 +239,16 @@ export default class HatiExtension extends Extension {
     const opacity = this._settings.get_double("opacity");
 
     this._highlightActor.set_size(size, size);
+    // Keep the red box for safety, but maybe match user color?
+    // Actually, stick to RED for now. If Shader works, RED is gone.
     this._highlightActor.set_style(`
-       background-color: rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha});
-       border: ${borderWeight}px solid white;
-       border-radius: ${size}px;
+       background-color: red; 
+       border: 2px solid white;
+       border-radius: 999px;
     `);
 
     this._highlightActor.set_opacity(Math.floor(opacity * 255));
+    this._highlightActor.queue_repaint();
   }
 
   _updateActorOpacity() {
