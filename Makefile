@@ -23,7 +23,12 @@ deploy-remote:
 	@ssh $(REMOTE_HOST) "mkdir -p '$(REMOTE_EXT_DIR)'"
 	@scp -r $(EXTENSION_DIR)/* $(REMOTE_HOST):"$(REMOTE_EXT_DIR)/"
 	@ssh $(REMOTE_HOST) "glib-compile-schemas '$(REMOTE_EXT_DIR)/schemas/'"
-	@echo "✅ Extension deployed to remote host. Logout/login on dionisus to apply."
+	@echo "📋 Installing schema globally (for CLI/Rust app)..."
+	@ssh $(REMOTE_HOST) "mkdir -p .local/share/glib-2.0/schemas"
+	@scp $(EXTENSION_DIR)/schemas/org.hati.Highlighter.gschema.xml $(REMOTE_HOST):.local/share/glib-2.0/schemas/
+	@ssh $(REMOTE_HOST) "glib-compile-schemas .local/share/glib-2.0/schemas/"
+	@echo "✅ Extension deployed & Schema installed globally."
+
 
 deploy-frontend-remote: build-frontend
 	@echo "🚀 Deploying frontend binary to $(REMOTE_HOST)..."
