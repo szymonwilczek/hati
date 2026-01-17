@@ -6,6 +6,7 @@ import GLib from "gi://GLib";
 import Meta from "gi://Meta";
 import Shell from "gi://Shell";
 import St from "gi://St";
+import Cairo from "gi://cairo";
 
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
@@ -75,8 +76,10 @@ export default class HatiExtension extends Extension {
     const borderWeight = this._settings.get_int("border-weight");
     const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
     const shape = this._getShapeValue(this._settings.get_string("shape"));
-
-    this._highlightActor = new St.Bin({
+    // Use St.DrawingArea to ensure a texture is generated.
+    // St.DrawingArea allows us to force-paint via Cairo, which provides valid UVs to the shader.
+    // This solves the visibility issue where St.Bin/St.Icon might get culled or have invalid UVs.
+    this._highlightActor = new St.DrawingArea({
       style_class: "hati-highlight",
       width: size,
       height: size,
@@ -85,20 +88,25 @@ export default class HatiExtension extends Extension {
       can_focus: false,
     });
 
-    // CRITICAL: Force offscreen redirection to solve transparency artifacts on Wayland
-    // This creates a separate buffer for the actor which is cleared every frame
+    // Force painting a dummy texture to ensure storage is allocated
+    this._highlightActor.connect("repaint", (area) => {
+      const cr = area.get_context();
+      // Draw a nearly valid pixel to force texture generation
+      // Using 0.01 alpha ensures it's 'there' for Clutter but invisible to user
+      // The shader will overwrite this anyway.
+      cr.setOperator(Cairo.Operator.SOURCE);
+      cr.setSourceRGBA(0, 0, 0, 0.1);
+      cr.paint();
+    });
+
+    // Explicitly do NOT set OffscreenRedirect manually.
+    // Clutter.ShaderEffect is an OffscreenEffect and handles redirection itself.
+    // Double redirection can cause issues.
+
+    // UPDATE: Research confirms that for GNOME 47/48/49, we MUST set OffscreenRedirect.ALWAYS
+    // otherwise Mutter optimizes away the offscreen buffer for transparent actors, making it invisible.
     this._highlightActor.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
 
-    // DEBUG MODE: Green box with red border + Offscreen Redirect
-    // Testing if Redirect itself is the cause of invisibility
-    this._highlightActor.set_style(`
-      background-color: rgba(0, 255, 0, 0.5); 
-      border: 4px solid red;
-      border-radius: 999px;
-    `);
-
-    // SHADER DISABLED FOR DEBUGGING
-    /*
     // Load and apply GLSL shader
     try {
       const shaderPath = this.path + "/shaders/highlight.glsl";
@@ -113,36 +121,29 @@ export default class HatiExtension extends Extension {
       shaderEffect.set_uniform_value("u_g", color.green / 255.0);
       shaderEffect.set_uniform_value("u_b", color.blue / 255.0);
       shaderEffect.set_uniform_value("u_alpha", color.alpha);
-      
+
       shaderEffect.set_uniform_value("u_border_weight", borderWeight);
       shaderEffect.set_uniform_value("u_glow", glow);
       shaderEffect.set_uniform_value("u_shape", shape);
-      
+
       shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
       shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
 
       this._highlightActor.add_effect(shaderEffect);
       this._shaderEffect = shaderEffect; // store for later updates
-      
-      console.log("[Hati] Shader applied successfully with Offscreen Redirect");
+
+      console.log("[Hati] Shader applied successfully (St.DrawingArea + PM Alpha)");
     } catch (e) {
       console.error("[Hati] Failed to load shader:", e);
-      // fallback to simple painted actor
-      this._highlightActor.set_background_color(
-        new Clutter.Color({
-          red: color.red,
-          green: color.green,
-          blue: color.blue,
-          alpha: Math.floor(color.alpha * 255),
-        }),
-      );
     }
-    */
 
     // Add to the UI group (above windows, below UI)
     Main.uiGroup.add_child(this._highlightActor);
 
-    console.log("[Hati] Highlight actor created (Debug: Green Box + Redirect)");
+    // Force a redraw to ensure the texture is generated initially
+    this._highlightActor.queue_repaint();
+
+    console.log("[Hati] Highlight actor created");
   }
 
   _destroyHighlightActor() {
@@ -258,6 +259,9 @@ export default class HatiExtension extends Extension {
       this._shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
       this._shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
     }
+
+    // Queue repaint to update Cairo surface size
+    this._highlightActor.queue_repaint();
   }
 
   _updateActorOpacity() {

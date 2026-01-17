@@ -67,9 +67,11 @@ void main() {
     // ring and glow
     float totalAlpha = max(ringAlpha, glowAlpha);
     
-    // color with calculated alpha
-    vec4 finalColor = vec4(u_color.rgb, u_color.a * totalAlpha);
+    // Combine texture alpha with global alpha setting
+    float finalAlpha = u_alpha * totalAlpha;
     
-    // output
-    cogl_color_out = finalColor;
+    // Output Color with PRE-MULTIPLIED ALPHA
+    // Clutter/Cogl expects RGB values to be multiplied by the Alpha value.
+    // Failure to do this causes "trailing" artifacts and incorrect blending on Wayland.
+    cogl_color_out = vec4(u_r * finalAlpha, u_g * finalAlpha, u_b * finalAlpha, finalAlpha);
 }
