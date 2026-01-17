@@ -89,8 +89,10 @@ export default class HatiExtension extends Extension {
     });
 
     // Valid background to ensure painting
+    // DEBUG: RED background. If you see this, the shader is NOT running.
+    // If you see the shader output, this is overwritten.
     this._highlightActor.set_style(`
-      background-color: black;
+      background-color: rgb(100, 0, 0); 
       border-radius: 999px;
     `);
 
