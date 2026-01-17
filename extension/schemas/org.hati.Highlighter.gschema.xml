@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.hati.Highlighter" path="/org/hati/highlighter/">
+    
+    <key name="enabled" type="b">
+      <default>false</default>
+      <summary>Enable Hati cursor highlighter</summary>
+      <description>Master toggle for cursor highlighting</description>
+    </key>
+    
+    <key name="color" type="s">
+      <default>'rgba(99, 162, 255, 0.7)'</default>
+      <summary>Highlight color</summary>
+      <description>RGBA color value for the cursor highlight ring</description>
+    </key>
+    
+    <key name="size" type="i">
+      <range min="40" max="200"/>
+      <default>80</default>
+      <summary>Highlight size</summary>
+      <description>Diameter of the highlight ring in pixels</description>
+    </key>
+    
+    <key name="opacity" type="d">
+      <range min="0.0" max="1.0"/>
+      <default>0.7</default>
+      <summary>Highlight opacity</summary>
+      <description>Overall transparency of the highlight (0.0 = invisible, 1.0 = opaque)</description>
+    </key>
+    
+    <key name="border-weight" type="i">
+      <range min="2" max="20"/>
+      <default>4</default>
+      <summary>Border thickness</summary>
+      <description>Thickness of the highlight ring border in pixels</description>
+    </key>
+    
+    <key name="shape" type="s">
+      <choices>
+        <choice value='circle'/>
+        <choice value='squircle'/>
+        <choice value='square'/>
+      </choices>
+      <default>'circle'</default>
+      <summary>Highlight shape</summary>
+      <description>Shape of the cursor highlight</description>
+    </key>
+    
+    <key name="glow" type="b">
+      <default>true</default>
+      <summary>Enable glow effect</summary>
+      <description>Add a soft glow around the highlight ring</description>
+    </key>
+    
+    <key name="click-animations" type="b">
+      <default>true</default>
+      <summary>Enable click animations</summary>
+      <description>Show ripple effect when clicking</description>
+    </key>
+    
+    <key name="auto-hide" type="b">
+      <default>false</default>
+      <summary>Auto-hide when stationary</summary>
+      <description>Automatically hide the highlight when the cursor isn't moving</description>
+    </key>
+    
+    <key name="auto-hide-delay" type="i">
+      <range min="500" max="5000"/>
+      <default>2000</default>
+      <summary>Auto-hide delay</summary>
+      <description>Time in milliseconds before hiding stationary cursor</description>
+    </key>
+    
+  </schema>
+</schemalist>

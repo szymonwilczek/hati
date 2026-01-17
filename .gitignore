@@ -1,0 +1,13 @@
+# compiled schemas
+extension/schemas/gschemas.compiled
+
+# rust build artifacts
+frontend/target/
+frontend/Cargo.lock
+
+# build artifacts
+*.zip
+dist/
+
+# system
+.DS_Store
