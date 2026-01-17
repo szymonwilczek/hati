@@ -76,13 +76,25 @@ export default class HatiExtension extends Extension {
     const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
     const shape = this._getShapeValue(this._settings.get_string("shape"));
 
-    this._highlightActor = new Clutter.Actor({
+    this._highlightActor = new St.Bin({
+      style_class: "hati-highlight",
       width: size,
       height: size,
       opacity: Math.floor(opacity * 255),
       reactive: false,
+      can_focus: false,
     });
 
+    // force a background color so Clutter paints something
+    // DEBUG: Green box with red border
+    this._highlightActor.set_style(`
+      background-color: rgba(0, 255, 0, 0.5); 
+      border: 4px solid red;
+      border-radius: 999px;
+    `);
+
+    // SHADER DISABLED FOR DEBUGGING
+    /*
     // load and apply GLSL shader
     try {
       const shaderPath = this.path + "/shaders/highlight.glsl";
@@ -97,17 +109,17 @@ export default class HatiExtension extends Extension {
       shaderEffect.set_uniform_value("u_g", color.green / 255.0);
       shaderEffect.set_uniform_value("u_b", color.blue / 255.0);
       shaderEffect.set_uniform_value("u_alpha", color.alpha);
-
+      
       shaderEffect.set_uniform_value("u_border_weight", borderWeight);
       shaderEffect.set_uniform_value("u_glow", glow);
       shaderEffect.set_uniform_value("u_shape", shape);
-
+      
       shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
       shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
 
       this._highlightActor.add_effect(shaderEffect);
       this._shaderEffect = shaderEffect; // store for later updates
-
+      
       console.log("[Hati] Shader applied successfully");
     } catch (e) {
       console.error("[Hati] Failed to load shader:", e);
@@ -121,11 +133,12 @@ export default class HatiExtension extends Extension {
         }),
       );
     }
+    */
 
-    // add to the UI group (above windows, below UI)
+    // UI group (above windows, below UI)
     Main.uiGroup.add_child(this._highlightActor);
 
-    console.log("[Hati] Highlight actor created");
+    console.log("[Hati] Highlight actor created (Debug Mode)");
   }
 
   _destroyHighlightActor() {
