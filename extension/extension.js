@@ -106,9 +106,11 @@ export default class HatiExtension extends Extension {
     this._velocityY = 0;
     this._tickId = 0;
 
-    // Physics Constants (Tuned for fluid "Cursor Pro" feel)
-    this._k = 0.15; // Stiffness (0.1 - 0.5)
-    this._d = 0.75; // Damping (0.5 - 0.9)
+    // Physics Constants (Tuned for "Subtle Polish")
+    // Visible Lag (k=0.12) gives a premium "weighty" feel.
+    // Moderate Friction (d=0.65) ensures smooth arrival without oscillation.
+    this._k = 0.12;
+    this._d = 0.65;
     this._squishDist = 0; // Will be calculated based on size
 
     // Initial Style
