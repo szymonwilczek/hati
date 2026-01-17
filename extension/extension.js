@@ -76,10 +76,10 @@ export default class HatiExtension extends Extension {
     const borderWeight = this._settings.get_int("border-weight");
     const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
     const shape = this._getShapeValue(this._settings.get_string("shape"));
-    // Use St.DrawingArea to ensure a texture is generated.
-    // St.DrawingArea allows us to force-paint via Cairo, which provides valid UVs to the shader.
-    // This solves the visibility issue where St.Bin/St.Icon might get culled or have invalid UVs.
-    this._highlightActor = new St.DrawingArea({
+    // EMERGENCY FALLBACK: St.Bin + OffscreenRedirect.ALWAYS
+    // This is the ONLY configuration proved to be visible (Step 534).
+    // UVs are broken, so we will use gl_FragCoord with Screen Height correction.
+    this._highlightActor = new St.Bin({
       style_class: "hati-highlight",
       width: size,
       height: size,
@@ -88,23 +88,13 @@ export default class HatiExtension extends Extension {
       can_focus: false,
     });
 
-    // Force painting a dummy texture to ensure storage is allocated
-    this._highlightActor.connect("repaint", (area) => {
-      const cr = area.get_context();
-      // Draw a nearly valid pixel to force texture generation
-      // Using 0.01 alpha ensures it's 'there' for Clutter but invisible to user
-      // The shader will overwrite this anyway.
-      cr.setOperator(Cairo.Operator.SOURCE);
-      cr.setSourceRGBA(0, 0, 0, 0.1);
-      cr.paint();
-    });
+    // Valid background to ensure painting
+    this._highlightActor.set_style(`
+      background-color: black;
+      border-radius: 999px;
+    `);
 
-    // Explicitly do NOT set OffscreenRedirect manually.
-    // Clutter.ShaderEffect is an OffscreenEffect and handles redirection itself.
-    // Double redirection can cause issues.
-
-    // UPDATE: Research confirms that for GNOME 47/48/49, we MUST set OffscreenRedirect.ALWAYS
-    // otherwise Mutter optimizes away the offscreen buffer for transparent actors, making it invisible.
+    // Mandatory for GNOME 49 visibility
     this._highlightActor.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
 
     // Load and apply GLSL shader
@@ -128,6 +118,11 @@ export default class HatiExtension extends Extension {
 
       shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
       shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
+
+      // Screen Space Uniforms
+      shaderEffect.set_uniform_value("u_pos_x", 0.0);
+      shaderEffect.set_uniform_value("u_pos_y", 0.0);
+      shaderEffect.set_uniform_value("u_root_height", parseFloat(Main.layoutManager.primaryMonitor.height));
 
       this._highlightActor.add_effect(shaderEffect);
       this._shaderEffect = shaderEffect; // store for later updates
@@ -192,6 +187,15 @@ export default class HatiExtension extends Extension {
 
     // update actor position
     this._highlightActor.set_position(centerX, centerY);
+
+    // Update Shader Uniforms for FragCoord Calculation
+    if (this._shaderEffect) {
+      this._shaderEffect.set_uniform_value("u_pos_x", centerX);
+      this._shaderEffect.set_uniform_value("u_pos_y", centerY);
+      // Ensure root height is correct (in case of changes, though unlikely for cursor loop)
+      // Optimization: only update if needed? For now, safety first.
+      this._shaderEffect.set_uniform_value("u_root_height", parseFloat(Main.layoutManager.primaryMonitor.height));
+    }
   }
 
   _onSettingsChanged(key) {

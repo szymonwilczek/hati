@@ -1,77 +1,76 @@
-// highlight.glsl - GLSL Fragment Shader for Hati Cursor Highlight
-// renders a smooth, anti-aliased circle/ring with optional glow effect
+// highlight.glsl - FRAGCOORD RESCUE SHADER
+// Uses screen-space coordinates to bypass broken UVs on Wayland/GNOME 49+
+// Implements Pre-Multiplied Alpha to fix blending artifacts.
 
-uniform float u_r;              // red component (0.0 - 1.0)
-uniform float u_g;              // green component (0.0 - 1.0)
-uniform float u_b;              // blue component (0.0 - 1.0)
-uniform float u_alpha;          // alpha component (0.0 - 1.0)
-uniform float u_border_weight;  // thickness of the ring border (in pixels)
-uniform float u_glow;           // glow intensity (0.0 = no glow, 1.0 = max glow)
-uniform float u_shape;          // shape parameter (0=circle, 1=squircle, 2=square)
+uniform float u_r;              // red component
+uniform float u_g;              // green component
+uniform float u_b;              // blue component
+uniform float u_alpha;          // global opacity
+uniform float u_border_weight;  // border thickness (pixels)
+uniform float u_glow;           // glow intensity
+uniform float u_shape;          // 0=circle, 1=squircle, 2=square
 uniform float u_res_x;          // actor width
 uniform float u_res_y;          // actor height
 
-// input from vertex shader
+// New uniforms for Screen Space rendering
+uniform float u_pos_x;          // actor screen x (top-left)
+uniform float u_pos_y;          // actor screen y (top-left)
+uniform float u_root_height;    // screen height (to flip Y)
+
+// input from vertex shader (ignored but required to avoid link errors)
 varying vec2 cogl_tex_coord_in[1];
 
 void main() {
-    // color and resolution vectors to keep logic cleaner
-    vec4 u_color = vec4(u_r, u_g, u_b, u_alpha);
-    vec2 u_resolution = vec2(u_res_x, u_res_y);
+    // 1. Calculate Center of Actor in Screen Space CLUTTER coordinates (0 at Top)
+    vec2 center = vec2(u_pos_x + u_res_x * 0.5, u_pos_y + u_res_y * 0.5);
+
+    // 2. Convert gl_FragCoord (0 at Bottom) to Clutter Space (0 at Top)
+    // We assume standard GL conventions where Y increases upwards.
+    float screenY = u_root_height - gl_FragCoord.y;
+    vec2 pixelPos = vec2(gl_FragCoord.x, screenY);
+
+    // 3. Calculate Vector from Center to Current Pixel
+    vec2 delta = pixelPos - center;
     
-    // normalized coordinates (0.0 to 1.0)
-    vec2 uv = cogl_tex_coord_in[0].st;
-    
-    // center coordinates (-1.0 to 1.0)
-    vec2 center = (uv - 0.5) * 2.0;
-    
-    // from center based on shape
-    float dist;
+    // 4. Calculate Distance (in pixels) based on shape
+    float dist = 0.0;
     
     if (u_shape < 0.5) {
-        // circle: standard Euclidean distance
-        dist = length(center);
+        // Circle
+        dist = length(delta);
     } else if (u_shape < 1.5) {
-        // squircle: smooth interpolation between circle and square
-        float p = 4.0; // squircle power (4.0 is common)
-        dist = pow(pow(abs(center.x), p) + pow(abs(center.y), p), 1.0 / p);
+        // Squircle
+        float p = 4.0;
+        dist = pow(pow(abs(delta.x), p) + pow(abs(delta.y), p), 1.0 / p);
     } else {
-        // square: Chebyshev distance
-        dist = max(abs(center.x), abs(center.y));
+        // Square
+        dist = max(abs(delta.x), abs(delta.y));
     }
     
-    // normalization
-    float radius = 1.0;
+    // 5. Render Ring and Glow
+    float radiusPixels = u_res_x * 0.5;
+    float borderPixels = u_border_weight;
+    float innerRadius = radiusPixels - borderPixels;
     
-    // ring parameters (normalized to actor size)
-    float outerRadius = radius;
-    float borderWeightNorm = u_border_weight / (u_resolution.x / 2.0);
-    float innerRadius = outerRadius - borderWeightNorm;
+    // Antialiasing (2.0 pixels wide)
+    float aa = 2.0;
     
-    // anti-aliasing factor (smooth edge)
-    float aa = 2.0 / u_resolution.x;
-    
-    // ring alpha
-    float outerEdge = smoothstep(outerRadius, outerRadius - aa, dist);
+    float outerEdge = smoothstep(radiusPixels, radiusPixels - aa, dist);
     float innerEdge = smoothstep(innerRadius - aa, innerRadius, dist);
     float ringAlpha = outerEdge * innerEdge;
     
-    // glow effect
+    // Glow
     float glowAlpha = 0.0;
     if (u_glow > 0.0) {
-        float glowRadius = outerRadius + 0.15; // extends 15% beyond ring
-        float glowFalloff = smoothstep(glowRadius, outerRadius, dist);
-        glowAlpha = glowFalloff * u_glow * 0.5; // dimmer than main ring
+        float glowRadius = radiusPixels + (radiusPixels * 0.3); // 30% larger
+        float glowFalloff = smoothstep(glowRadius, radiusPixels, dist);
+        glowAlpha = glowFalloff * u_glow * 0.5;
     }
     
-    // ring and glow
     float totalAlpha = max(ringAlpha, glowAlpha);
     
-    // Combine texture alpha with global alpha setting
+    // 6. Output with PRE-MULTIPLIED ALPHA
     float finalAlpha = u_alpha * totalAlpha;
     
-    // Output Color with PRE-MULTIPLIED ALPHA
-    // Clutter/Cogl expects RGB values to be multiplied by the Alpha value.
-    // Failure to do this causes "trailing" artifacts and incorrect blending on Wayland.
     cogl_color_out = vec4(u_r * finalAlpha, u_g * finalAlpha, u_b * finalAlpha, finalAlpha);
 }
