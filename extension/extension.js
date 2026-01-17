@@ -76,8 +76,9 @@ export default class HatiExtension extends Extension {
     const borderWeight = this._settings.get_int("border-weight");
     const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
     const shape = this._getShapeValue(this._settings.get_string("shape"));
-    // NUCLEAR OPTION: Pure CSS Actor. No Shaders. No Redirects.
-    // We strictly need to verify that the actor can be seen on screen.
+    // CSS-Based Highlight Actor
+    // ShaderEffect is unreliable on GNOME 49 (invisibility).
+    // We use standard St/CSS properties to achieve the ring/glow effect.
     this._highlightActor = new St.Bin({
       style_class: "hati-highlight",
       width: size,
@@ -87,57 +88,13 @@ export default class HatiExtension extends Extension {
       can_focus: false,
     });
 
-    this._highlightActor.set_style(`
-      background-color: red;
-      border: 2px solid white;
-      border-radius: 999px;
-    `);
-
-    // No Effects. No Redirects. Just a red box.
-    // This MUST be visible.
-
-    // Load and apply GLSL shader
-    try {
-      const shaderPath = this.path + "/shaders/highlight.glsl";
-      const shaderSource = Shell.get_file_contents_utf8_sync(shaderPath);
-
-      const shaderEffect = new Clutter.ShaderEffect();
-
-      shaderEffect.set_shader_source(shaderSource);
-
-      // set shader uniforms
-      shaderEffect.set_uniform_value("u_r", color.red / 255.0);
-      shaderEffect.set_uniform_value("u_g", color.green / 255.0);
-      shaderEffect.set_uniform_value("u_b", color.blue / 255.0);
-      shaderEffect.set_uniform_value("u_alpha", color.alpha);
-
-      shaderEffect.set_uniform_value("u_border_weight", borderWeight);
-      shaderEffect.set_uniform_value("u_glow", glow);
-      shaderEffect.set_uniform_value("u_shape", shape);
-
-      shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
-      shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
-
-      // Screen Space Uniforms
-      shaderEffect.set_uniform_value("u_pos_x", 0.0);
-      shaderEffect.set_uniform_value("u_pos_y", 0.0);
-      shaderEffect.set_uniform_value("u_root_height", parseFloat(Main.layoutManager.primaryMonitor.height));
-
-      this._highlightActor.add_effect(shaderEffect);
-      this._shaderEffect = shaderEffect; // store for later updates
-
-      console.log("[Hati] Shader applied successfully to St.Bin");
-    } catch (e) {
-      console.error("[Hati] Failed to load shader:", e);
-    }
+    // Initial Style
+    this._refreshStyle();
 
     // Add to the UI group (above windows, below UI)
     Main.uiGroup.add_child(this._highlightActor);
 
-    // Force a redraw to ensure the texture is generated initially
-    this._highlightActor.queue_repaint();
-
-    console.log("[Hati] Highlight actor created (CSS + Shader Mode)");
+    console.log("[Hati] Highlight actor created (Pure CSS Mode)");
   }
 
   _removeHighlightActor() {
@@ -150,8 +107,6 @@ export default class HatiExtension extends Extension {
       Main.uiGroup.remove_child(this._highlightActor);
       this._highlightActor.destroy();
       this._highlightActor = null;
-      this._shaderEffect = null;
-      this._content = null;
     }
   }
 
@@ -187,13 +142,6 @@ export default class HatiExtension extends Extension {
 
     // update actor position
     this._highlightActor.set_position(centerX, centerY);
-
-    // Update Shader Uniforms for FragCoord Calculation
-    if (this._shaderEffect) {
-      this._shaderEffect.set_uniform_value("u_pos_x", centerX);
-      this._shaderEffect.set_uniform_value("u_pos_y", centerY);
-      this._shaderEffect.set_uniform_value("u_root_height", parseFloat(Main.layoutManager.primaryMonitor.height));
-    }
   }
 
   _onSettingsChanged(key) {
@@ -204,51 +152,52 @@ export default class HatiExtension extends Extension {
 
     // Update CSS
     this._refreshStyle();
-
-    // Update Shader Uniforms
-    if (this._shaderEffect) {
-      const color = this._parseColor(this._settings.get_string("color"));
-      const borderWeight = this._settings.get_int("border-weight");
-      const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
-      const shape = this._getShapeValue(this._settings.get_string("shape"));
-      const size = this._settings.get_int("size");
-
-      this._shaderEffect.set_uniform_value("u_r", color.red / 255.0);
-      this._shaderEffect.set_uniform_value("u_g", color.green / 255.0);
-      this._shaderEffect.set_uniform_value("u_b", color.blue / 255.0);
-      this._shaderEffect.set_uniform_value("u_alpha", color.alpha);
-
-      this._shaderEffect.set_uniform_value("u_border_weight", borderWeight);
-      this._shaderEffect.set_uniform_value("u_glow", glow);
-      this._shaderEffect.set_uniform_value("u_shape", shape);
-
-      if (key === "size") {
-        this._shaderEffect.set_uniform_value("u_res_x", parseFloat(size));
-        this._shaderEffect.set_uniform_value("u_res_y", parseFloat(size));
-      }
-    }
   }
 
   _refreshStyle() {
     if (!this._highlightActor) return;
 
-    // Simple CSS refresh
+    // Fetch Settings
     const size = this._settings.get_int("size");
-    const color = this._parseColor(this._settings.get_string("color"));
+    const colorStr = this._settings.get_string("color");
+    const color = this._parseColor(colorStr);
     const borderWeight = this._settings.get_int("border-weight");
     const opacity = this._settings.get_double("opacity");
+    const shapeStr = this._settings.get_string("shape"); // circle, square, squircle
+    const glow = this._settings.get_boolean("glow");
+
+    // Map Shape to Border Radius
+    let radius = "0px";
+    if (shapeStr === "circle") {
+      radius = "50%"; // Perfect circle
+    } else if (shapeStr === "squircle") {
+      radius = "25%"; // Approximate squircle
+    } else {
+      radius = "0px"; // Square
+    }
+
+    // Map Glow to Box Shadow
+    // box-shadow: x y blur spread color
+    // We use a simplified glow if enabled
+    let shadow = "none";
+    if (glow) {
+      // Use the same color as border but maybe more transparent?
+      // Or just the same color.
+      shadow = `0 0 10px 2px rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha})`;
+    }
 
     this._highlightActor.set_size(size, size);
-    // Keep the red box for safety, but maybe match user color?
-    // Actually, stick to RED for now. If Shader works, RED is gone.
-    this._highlightActor.set_style(`
-       background-color: red; 
-       border: 2px solid white;
-       border-radius: 999px;
-    `);
-
     this._highlightActor.set_opacity(Math.floor(opacity * 255));
-    this._highlightActor.queue_repaint();
+
+    // Construct CSS String
+    // Note: We use transparent background to see through the ring.
+    // Ideally we want the border to define the shape.
+    this._highlightActor.set_style(`
+       background-color: transparent;
+       border: ${borderWeight}px solid rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha});
+       border-radius: ${radius};
+       box-shadow: ${shadow};
+    `);
   }
 
   _updateActorOpacity() {
