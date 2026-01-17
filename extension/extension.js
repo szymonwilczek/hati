@@ -99,17 +99,32 @@ export default class HatiExtension extends Extension {
 
     this._containerActor.set_child(this._highlightActor);
 
+    // State for Physics
+    this._currentX = 0;
+    this._currentY = 0;
+    this._velocityX = 0;
+    this._velocityY = 0;
+    this._tickId = 0;
+
+    // Physics Constants (Tuned for fluid "Cursor Pro" feel)
+    this._k = 0.15; // Stiffness (0.1 - 0.5)
+    this._d = 0.75; // Damping (0.5 - 0.9)
+    this._squishDist = 0; // Will be calculated based on size
+
     // Initial Style
     this._refreshStyle();
 
     // Add Container to UI Group
     Main.uiGroup.add_child(this._containerActor);
 
-    // Optional: Force OffscreenRedirect on Container IF artifacts persist.
-    // For now, the larger size should be enough.
-    // this._containerActor.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
+    // Start Physics Loop using GLib Timeout (Fallback for Clutter tick issues)
+    // Runs at ~60 FPS (16ms)
+    this._tickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
+      this._tick();
+      return GLib.SOURCE_CONTINUE;
+    });
 
-    console.log("[Hati] Highlight actor created (Container + CSS Mode)");
+    console.log("[Hati] Highlight actor created (Container + CSS + Physics Mode)");
   }
 
   _removeHighlightActor() {
@@ -117,6 +132,11 @@ export default class HatiExtension extends Extension {
       if (this._trackingId) {
         this._containerActor.remove_effect(this._trackingId);
         this._trackingId = null;
+      }
+
+      if (this._tickId) {
+        GLib.source_remove(this._tickId);
+        this._tickId = 0;
       }
 
       Main.uiGroup.remove_child(this._containerActor);
@@ -127,43 +147,100 @@ export default class HatiExtension extends Extension {
   }
 
   _startCursorTracking() {
-    if (this._updateId) {
-      return; // already tracking!
-    }
-
-    // use frame clock for smooth updates
-    this._updateId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
-      this._updateHighlightPosition();
-      return GLib.SOURCE_CONTINUE; // keep running
-    });
-
-    console.log("[Hati] Cursor tracking started");
+    // Deprecated: Physics loop starts on creation
   }
 
   _stopCursorTracking() {
-    if (this._updateId) {
-      GLib.source_remove(this._updateId);
-      this._updateId = null;
-      console.log("[Hati] Cursor tracking stopped");
-    }
+    // Deprecated: Physics loop stops on destruction
   }
 
-  _updateHighlightPosition() {
-    if (!this._containerActor) return;
+  _tick() {
+    if (!this._containerActor || !this._highlightActor) return Clutter.TICK_STOP;
 
-    const [x, y] = global.get_pointer();
-    // Container is larger, but we want to center the VISUAL part on the cursor.
-    // Since Inner is centered in Container, we just center Container on cursor.
+    const [pointerX, pointerY] = global.get_pointer();
 
-    // Effectively: Center of Container == Cursor.
+    // 1. Spring Physics Algorithm (Frame-independent-ish approximation)
+    // F = -k*x - d*v
+
+    // Target is where the mouse IS
+    // Current is where the actor IS
+    // In our system, we want the CENTER of the actor to be at the mouse.
+
     const containerWidth = this._containerActor.get_width();
     const containerHeight = this._containerActor.get_height();
 
-    const centerX = x - containerWidth / 2;
-    const centerY = y - containerHeight / 2;
+    // Dist from Mouse to Center of Actor
+    // We track total position of Top-Left corner for set_position
+    // But physics operates on "Center Point".
 
-    this._containerActor.set_position(centerX, centerY);
+    // Let's track the CENTER position in physics vars
+    // Initialize if zero (first run)
+    if (this._currentX === 0 && this._currentY === 0) {
+      this._currentX = pointerX;
+      this._currentY = pointerY;
+    }
+
+    const dx = pointerX - this._currentX;
+    const dy = pointerY - this._currentY;
+
+    const ax = dx * this._k;
+    const ay = dy * this._k;
+
+    this._velocityX = (this._velocityX + ax) * this._d;
+    this._velocityY = (this._velocityY + ay) * this._d;
+
+    this._currentX += this._velocityX;
+    this._currentY += this._velocityY;
+
+    // Apply Position (Top-Left)
+    this._containerActor.set_position(
+      this._currentX - containerWidth / 2,
+      this._currentY - containerHeight / 2
+    );
+
+    // 2. Squash & Stretch based on Velocity (Optional)
+    // Stretch in direction of movement
+    const velocity = Math.sqrt(this._velocityX ** 2 + this._velocityY ** 2);
+    // Scale factor: 1.0 + (velocity * 0.01)
+    // Needs rotation to match velocity vector? Complex for CSS box.
+    // Let's stick to Edge Squish first.
+
+    // 3. Edge Squish
+    // If center is close to screen edge, squash the INNER actor.
+    const monitor = Main.layoutManager.primaryMonitor;
+    if (!monitor) return Clutter.TICK_CONTINUE;
+
+    // Distance to edges
+    const distLeft = this._currentX - monitor.x;
+    const distRight = (monitor.x + monitor.width) - this._currentX;
+    const distTop = this._currentY - monitor.y;
+    const distBottom = (monitor.y + monitor.height) - this._currentY;
+
+    // Radius of visual part
+    const size = this._settings.get_int("size");
+    const radius = size / 2;
+    const limit = radius + 20; // Start squishing slightly before touch
+
+    let scaleX = 1.0;
+    let scaleY = 1.0;
+
+    if (distLeft < limit) scaleX = Math.max(0.4, distLeft / limit);
+    if (distRight < limit) scaleX = Math.max(0.4, distRight / limit);
+    if (distTop < limit) scaleY = Math.max(0.4, distTop / limit);
+    if (distBottom < limit) scaleY = Math.max(0.4, distBottom / limit);
+
+    // Gentle recovery curve
+    scaleX = Math.pow(scaleX, 0.5);
+    scaleY = Math.pow(scaleY, 0.5);
+
+    // Apply scaling to INNER actor (Visuals only)
+    this._highlightActor.set_scale(scaleX, scaleY);
+
+    return Clutter.TICK_CONTINUE;
   }
+
+  // Clean up unused function
+  _updateHighlightPosition() { }
 
   _onSettingsChanged(key) {
     if (key === "enabled") {
@@ -207,6 +284,10 @@ export default class HatiExtension extends Extension {
 
     // 1. Style the Inner Actor (Visuals)
     this._highlightActor.set_size(size, size);
+
+    // Reset Pivot Point to Center for Scaling
+    this._highlightActor.set_pivot_point(0.5, 0.5);
+
     this._highlightActor.set_style(`
        background-color: transparent;
        border: ${borderWeight}px solid rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha});
