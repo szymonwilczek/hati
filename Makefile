@@ -25,6 +25,16 @@ deploy-remote:
 	@ssh $(REMOTE_HOST) "glib-compile-schemas '$(REMOTE_EXT_DIR)/schemas/'"
 	@echo "✅ Extension deployed to remote host. Logout/login on dionisus to apply."
 
+deploy-frontend-remote: build-frontend
+	@echo "🚀 Deploying frontend binary to $(REMOTE_HOST)..."
+	@ssh $(REMOTE_HOST) "mkdir -p .local/bin"
+	@scp $(FRONTEND_DIR)/target/release/hati $(REMOTE_HOST):.local/bin/
+	@echo "✅ Frontend deployed. Run 'hati' on remote host to configure."
+
+deploy-all-remote: deploy-remote deploy-frontend-remote
+	@echo "🎉 Complete deployment finished!"
+
+
 
 # frontend targets
 build-frontend:
