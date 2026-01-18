@@ -71,6 +71,12 @@
       <description>Time in milliseconds before hiding stationary cursor</description>
     </key>
 
+    <key name="inertia-enabled" type="b">
+      <default>true</default>
+      <summary>Enable inertia physics</summary>
+      <description>If true, cursor uses spring-damper physics. If false, it follows pointer instantly.</description>
+    </key>
+
     <key name="inertia-stiffness" type="d">
       <range min="0.01" max="1.0"/>
       <default>0.12</default>
