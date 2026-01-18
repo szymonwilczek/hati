@@ -6,6 +6,7 @@ import GLib from "gi://GLib";
 import Meta from "gi://Meta";
 import Shell from "gi://Shell";
 import St from "gi://St";
+import Gio from "gi://Gio";
 import Cairo from "gi://cairo";
 
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
@@ -25,12 +26,25 @@ export default class HatiExtension extends Extension {
     console.log("[Hati] Enabling cursor highlighter...");
 
     this._settings = this.getSettings("org.hati.Highlighter");
+    this._interfaceSettings = new Gio.Settings({
+      schema_id: "org.gnome.desktop.interface",
+    });
 
     // watch for settings changes
     this._settingsChangedId = this._settings.connect(
       "changed",
       (settings, key) => {
         this._onSettingsChanged(key);
+      },
+    );
+
+    // watch for system accent changes
+    this._interfaceSettingsChangedId = this._interfaceSettings.connect(
+      "changed::accent-color",
+      () => {
+        if (this._settings.get_boolean("use-system-accent")) {
+          this._refreshStyle();
+        }
       },
     );
 
@@ -59,6 +73,14 @@ export default class HatiExtension extends Extension {
         this._settingsChangedId = null;
       }
       this._settings = null;
+    }
+
+    if (this._interfaceSettings) {
+      if (this._interfaceSettingsChangedId) {
+        this._interfaceSettings.disconnect(this._interfaceSettingsChangedId);
+        this._interfaceSettingsChangedId = null;
+      }
+      this._interfaceSettings = null;
     }
 
     console.log("[Hati] Disabled successfully");
@@ -314,8 +336,32 @@ export default class HatiExtension extends Extension {
     if (!this._highlightActor || !this._containerActor) return;
 
     const size = this._settings.get_int("size");
-    const colorStr = this._settings.get_string("color");
-    const color = this._parseColor(colorStr);
+    let colorString = this._settings.get_string("color");
+
+    // system accent override
+    if (
+      this._interfaceSettings &&
+      this._settings.get_boolean("use-system-accent")
+    ) {
+      const accent = this._interfaceSettings.get_string("accent-color");
+      const ACCENT_COLORS = {
+        blue: "rgba(53, 132, 228, 1)",
+        teal: "rgba(99, 193, 190, 1)",
+        green: "rgba(51, 209, 122, 1)",
+        yellow: "rgba(246, 211, 45, 1)",
+        orange: "rgba(255, 120, 0, 1)",
+        red: "rgba(224, 27, 36, 1)",
+        pink: "rgba(213, 97, 157, 1)",
+        purple: "rgba(145, 65, 172, 1)",
+        slate: "rgba(119, 118, 123, 1)",
+        default: "rgba(53, 132, 228, 1)",
+      };
+      if (ACCENT_COLORS[accent]) {
+        colorString = ACCENT_COLORS[accent];
+      }
+    }
+
+    const color = this._parseColor(colorString);
     const borderWeight = this._settings.get_int("border-weight");
     const gap = this._settings.get_double("gap");
     const opacity = this._settings.get_double("opacity");
@@ -354,6 +400,13 @@ export default class HatiExtension extends Extension {
       clickAnimationMode: this._settings.get_string("click-animation-mode"),
       dashedBorder: this._settings.get_boolean("dashed-border"),
       dashGapSize: this._settings.get_double("dash-gap-size"),
+      useSystemAccent: this._settings.get_boolean("use-system-accent"),
+      leftClickColor: this._parseColor(
+        this._settings.get_string("left-click-color"),
+      ),
+      rightClickColor: this._parseColor(
+        this._settings.get_string("right-click-color"),
+      ),
     };
 
     // Canvas sizing and invalidation
@@ -415,15 +468,17 @@ export default class HatiExtension extends Extension {
       const progress = this._clickState.progress;
       const button = this._clickState.button; // 'left' or 'right'
 
-      // 1. Color Blending
-      // Target colors: Left = Blue (0.2, 0.6, 1.0), Right = Red (1.0, 0.2, 0.2)
-      let targetR = 0.2,
-        targetG = 0.6,
-        targetB = 1.0; // Blueish
+      // color blending
+      let targetR, targetG, targetB;
+
       if (button === "right") {
-        targetR = 1.0;
-        targetG = 0.2;
-        targetB = 0.2; // Reddish
+        targetR = this._drawSettings.rightClickColor.red / 255;
+        targetG = this._drawSettings.rightClickColor.green / 255;
+        targetB = this._drawSettings.rightClickColor.blue / 255;
+      } else {
+        targetR = this._drawSettings.leftClickColor.red / 255;
+        targetG = this._drawSettings.leftClickColor.green / 255;
+        targetB = this._drawSettings.leftClickColor.blue / 255;
       }
 
       // Simple blend: current * (1-p) + target * p

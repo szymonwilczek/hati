@@ -119,12 +119,39 @@ impl HatiWindow {
             .title("Appearance")
             .build();
 
+        // System Accent Toggle
+        let system_accent_row = adw::SwitchRow::builder()
+            .title("Use System Accent Color")
+            .subtitle("Sync with desktop accent (GNOME 46+)")
+            .build();
+        system_accent_row.set_active(settings.boolean("use-system-accent"));
+        settings.bind("use-system-accent", &system_accent_row, "active").build();
+        appearance_group.add(&system_accent_row);
+
+        // Color Row
         let color_row = adw::ActionRow::builder()
-            .title("Color")
-            .subtitle("Highlight color")
+            .title("Custom Color")
+            .subtitle("Highlight color (if accent disabled)")
             .build();
 
         let color_button = ColorButton::new();
+        // Neon Palette
+        // R, G, B (0-255)
+        // Cyan, Magenta, Lime, Electric Purple, Hot Pink, Bright Orange, Yellow, Neon Blue, Radio Green
+        let neon_colors = [
+            gtk4::gdk::RGBA::parse("rgba(0, 255, 255, 1.0)").unwrap(), // Cyan
+            gtk4::gdk::RGBA::parse("rgba(255, 0, 255, 1.0)").unwrap(), // Magenta
+            gtk4::gdk::RGBA::parse("rgba(50, 255, 50, 1.0)").unwrap(), // Lime
+            gtk4::gdk::RGBA::parse("rgba(180, 0, 255, 1.0)").unwrap(), // Electric Purple
+            gtk4::gdk::RGBA::parse("rgba(255, 20, 147, 1.0)").unwrap(), // Hot Pink
+            gtk4::gdk::RGBA::parse("rgba(255, 165, 0, 1.0)").unwrap(), // Neon Orange
+            gtk4::gdk::RGBA::parse("rgba(255, 255, 0, 1.0)").unwrap(), // Yellow
+            gtk4::gdk::RGBA::parse("rgba(30, 144, 255, 1.0)").unwrap(), // Dodger Blue
+            gtk4::gdk::RGBA::parse("rgba(57, 255, 20, 1.0)").unwrap(), // Neon Green
+        ];
+        // Add palette (Orientation Horizontal = 0, lines params)
+        color_button.add_palette(gtk4::Orientation::Horizontal, 9, &neon_colors);
+
         let rgba = Self::parse_rgba(&settings.string("color"));
         color_button.set_rgba(&rgba);
         
@@ -140,8 +167,46 @@ impl HatiWindow {
             settings.set_string("color", &color_str).unwrap();
         }));
 
+        settings.bind("use-system-accent", &color_button, "sensitive")
+            .flags(gio::SettingsBindFlags::INVERT_BOOLEAN)
+            .build();
+
         color_row.add_suffix(&color_button);
         appearance_group.add(&color_row);
+
+        // --- Left Click Color ---
+        let left_click_row = adw::ActionRow::builder()
+            .title("Left Click Color")
+            .subtitle("Animation color for left mouse button")
+            .build();
+        let left_color_btn = ColorButton::new();
+        left_color_btn.add_palette(gtk4::Orientation::Horizontal, 9, &neon_colors);
+        let left_rgba = Self::parse_rgba(&settings.string("left-click-color"));
+        left_color_btn.set_rgba(&left_rgba);
+        left_color_btn.connect_rgba_notify(clone!(@weak settings => move |button| {
+            let rgba = button.rgba();
+            let color_str = format!("rgba({}, {}, {}, {})", (rgba.red() * 255.0) as u8, (rgba.green() * 255.0) as u8, (rgba.blue() * 255.0) as u8, rgba.alpha());
+            settings.set_string("left-click-color", &color_str).unwrap();
+        }));
+        left_click_row.add_suffix(&left_color_btn);
+        appearance_group.add(&left_click_row);
+
+        // --- Right Click Color ---
+        let right_click_row = adw::ActionRow::builder()
+            .title("Right Click Color")
+            .subtitle("Animation color for right mouse button")
+            .build();
+        let right_color_btn = ColorButton::new();
+        right_color_btn.add_palette(gtk4::Orientation::Horizontal, 9, &neon_colors);
+        let right_rgba = Self::parse_rgba(&settings.string("right-click-color"));
+        right_color_btn.set_rgba(&right_rgba);
+        right_color_btn.connect_rgba_notify(clone!(@weak settings => move |button| {
+            let rgba = button.rgba();
+            let color_str = format!("rgba({}, {}, {}, {})", (rgba.red() * 255.0) as u8, (rgba.green() * 255.0) as u8, (rgba.blue() * 255.0) as u8, rgba.alpha());
+            settings.set_string("right-click-color", &color_str).unwrap();
+        }));
+        right_click_row.add_suffix(&right_color_btn);
+        appearance_group.add(&right_click_row);
 
         // size slider
         let size_row = adw::SpinRow::builder()

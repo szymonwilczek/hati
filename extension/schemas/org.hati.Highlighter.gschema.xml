@@ -87,6 +87,11 @@
       <description>Spread radius of the glow in pixels</description>
     </key>
     
+    <key name="additional-deformations" type="b">
+      <default>false</default>
+      <summary>Enable additional shape deformations</summary>
+      <description>If true, adds symmetric indentations to the shape edges.</description>
+    </key>
     <key name="dashed-border" type="b">
       <default>false</default>
       <summary>Enable dashed inner border</summary>
@@ -97,11 +102,27 @@
       <summary>Size of gap between dashes</summary>
       <description>Controls the density of the dashes. Smaller value = higher density.</description>
     </key>
+    <key name="use-system-accent" type="b">
+      <default>false</default>
+      <summary>Use system accent color</summary>
+      <description>If true, overrides the custom color with the system accent color.</description>
+    </key>
     
     <key name="click-animations" type="b">
       <default>true</default>
       <summary>Enable click animations</summary>
       <description>Show ripple/directional effect when clicking</description>
+    </key>
+
+    <key name="left-click-color" type="s">
+      <default>'rgba(0, 0, 255, 1)'</default>
+      <summary>Left click animation color</summary>
+      <description>Color validation string (rgba)</description>
+    </key>
+    <key name="right-click-color" type="s">
+      <default>'rgba(255, 0, 0, 1)'</default>
+      <summary>Right click animation color</summary>
+      <description>Color validation string (rgba)</description>
     </key>
 
     <key name="click-animation-mode" type="s">
