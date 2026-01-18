@@ -3,8 +3,8 @@ TODO
 
 Sorted by priority (updated constantly):
 
+- Fix for Glow effect (only outside, never inside)
+
 - Click animations (left/right separately)
 
 - Deformations between curves (to create symetric but uneven structures - better visuals)
-
-- Fix for Glow effect (only outside, never inside)
