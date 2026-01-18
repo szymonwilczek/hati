@@ -285,7 +285,24 @@ export default class HatiExtension extends Extension {
       return;
     }
 
-    this._refreshStyle();
+    // Explicitly handle all visual keys to be safe
+    // Fallthrough would work but this is clearer
+    if (
+      key === "size" ||
+      key === "color" ||
+      key === "opacity" ||
+      key === "border-weight" ||
+      key === "shape" ||
+      key === "glow" ||
+      key === "corner-radius" ||
+      key === "glow-radius" ||
+      key === "glow-spread"
+    ) {
+      this._refreshStyle();
+      return;
+    }
+
+    this._refreshStyle(); // Catch-all
   }
 
   _refreshStyle() {
@@ -297,27 +314,29 @@ export default class HatiExtension extends Extension {
     const color = this._parseColor(colorStr);
     const borderWeight = this._settings.get_int("border-weight");
     const opacity = this._settings.get_double("opacity");
-    const shapeStr = this._settings.get_string("shape");
+    const shapeStr = this._settings.get_string("shape"); // Kept for shader compat if needed
     const glow = this._settings.get_boolean("glow");
+    const cornerRadius = this._settings.get_int("corner-radius");
+    const glowRadius = this._settings.get_int("glow-radius");
+    const glowSpread = this._settings.get_int("glow-spread");
 
-    // Logic: Shape
-    let radius = "0px";
-    if (shapeStr === "circle") {
-      radius = "50%";
-    } else if (shapeStr === "squircle") {
-      radius = "25%";
-    }
+    console.log(`[Hati] Refresh Style: CornerRadius=${cornerRadius}, Shape=${shapeStr}, GlowRadius=${glowRadius}`);
+
+    // Logic: Shape (Corner Radius driven)
+    let radius = `${cornerRadius}%`;
 
     // Logic: Glow
     let shadow = "none";
     let padding = 0;
 
     if (glow) {
-      // Robust Glow: large blur radius
-      shadow = `0 0 20px 5px rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha})`;
-      padding = 50; // Extra space for glow
+      // Glow driven by settings
+      // color is an object {red, green, blue, alpha}
+      shadow = `0 0 ${glowRadius}px ${glowSpread}px rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha})`;
+      // Dynamic padding based on glow spread + fuzziness
+      padding = glowSpread + glowRadius + 10;
     } else {
-      padding = 10; // Basic anti-aliasing margin
+      padding = 10; // Basic margin
     }
 
     // 1. Style the Inner Actor (Visuals)
