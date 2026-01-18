@@ -274,11 +274,12 @@ export default class HatiExtension extends Extension {
     this._canvas.set_size(totalSize, totalSize);
     this._canvas.queue_repaint();
 
-    // Opacity on container
-    this._containerActor.set_opacity(Math.floor(opacity * 255));
+    // Don't apply opacity to container - Cairo handles all transparency
+    // This prevents double-opacity multiplication
+    this._containerActor.set_opacity(255);
   }
 
-  // Cairo drawing callback for St.DrawingArea
+  // Cairo drawing callback for St.DrawingArea - DUAL RING VERSION
   _drawHighlight(area) {
     const cr = area.get_context();
     const [width, height] = area.get_surface_size();
@@ -295,33 +296,62 @@ export default class HatiExtension extends Extension {
 
     const centerX = width / 2;
     const centerY = height / 2;
-    const halfSize = size / 2;
 
-    // Set color (Cairo uses 0-1 range)
+    // Helper function to draw rounded rectangle path
+    const drawRoundedRect = (halfW, cornerR) => {
+      const x = centerX - halfW;
+      const y = centerY - halfW;
+      const w = halfW * 2;
+      const h = halfW * 2;
+      const r = Math.max(0, cornerR);
+
+      cr.newPath();
+      if (r > 0) {
+        cr.arc(x + w - r, y + r, r, -Math.PI / 2, 0);
+        cr.arc(x + w - r, y + h - r, r, 0, Math.PI / 2);
+        cr.arc(x + r, y + h - r, r, Math.PI / 2, Math.PI);
+        cr.arc(x + r, y + r, r, Math.PI, 3 * Math.PI / 2);
+      } else {
+        cr.rectangle(x, y, w, h);
+      }
+      cr.closePath();
+    };
+
+    // Calculate ring dimensions
+    // Outer: borderWeight px, 100% opaque
+    // Inner: borderWeight + 1 px, user's opacity
+    // 1px gap for visual separation
+    const outerBorderWidth = borderWeight;
+    const innerBorderWidth = borderWeight + 1;
+    const gap = 0.1; // Minimal gap
+
+    const outerHalf = size / 2;
+    // Inner ring starts where outer ring ends plus gap
+    const innerHalf = outerHalf - outerBorderWidth - gap - (innerBorderWidth / 2);
+    const outerRadius = radiusPx;
+    const innerRadius = Math.max(0, radiusPx - outerBorderWidth - gap);
+
+    // 1. DRAW OUTER RING (100% Opaque)
     cr.setSourceRGBA(
       color.red / 255,
       color.green / 255,
       color.blue / 255,
-      color.alpha
+      1.0 // Always 100% opaque
     );
+    cr.setLineWidth(outerBorderWidth);
+    drawRoundedRect(outerHalf - outerBorderWidth / 2, outerRadius);
+    cr.stroke();
 
-    cr.setLineWidth(borderWeight);
-
-    // Draw rounded rectangle path
-    const radius = radiusPx;
-    const x = centerX - halfSize;
-    const y = centerY - halfSize;
-    const w = size;
-    const h = size;
-
-    // Rounded rectangle using arcs
-    cr.newPath();
-    cr.arc(x + w - radius, y + radius, radius, -Math.PI / 2, 0);
-    cr.arc(x + w - radius, y + h - radius, radius, 0, Math.PI / 2);
-    cr.arc(x + radius, y + h - radius, radius, Math.PI / 2, Math.PI);
-    cr.arc(x + radius, y + radius, radius, Math.PI, 3 * Math.PI / 2);
-    cr.closePath();
-
+    // 2. DRAW INNER RING (User's opacity setting)
+    const { opacity } = this._drawSettings;
+    cr.setSourceRGBA(
+      color.red / 255,
+      color.green / 255,
+      color.blue / 255,
+      opacity // User's opacity from settings slider
+    );
+    cr.setLineWidth(innerBorderWidth);
+    drawRoundedRect(innerHalf, innerRadius);
     cr.stroke();
 
     // Dispose context when done
