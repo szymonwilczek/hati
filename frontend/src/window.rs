@@ -215,6 +215,33 @@ impl HatiWindow {
         settings.bind("gap", &gap_row, "value").build();
         border_group.add(&gap_row);
 
+        // Dashed Border Toggle
+        let dashed_border_row = adw::SwitchRow::builder()
+            .title("Dashed Inner Border")
+            .subtitle("Make the inner ring dashed")
+            .build();
+        dashed_border_row.set_active(settings.boolean("dashed-border"));
+        settings.bind("dashed-border", &dashed_border_row, "active").build();
+        border_group.add(&dashed_border_row);
+
+        // Dash Gap Size
+        let dash_gap_row = adw::SpinRow::builder()
+            .title("Dash Density")
+            .subtitle("Gap between ticks (Lower = denser)")
+            .adjustment(&gtk4::Adjustment::new(
+                settings.double("dash-gap-size"),
+                2.0,
+                20.0,
+                1.0,
+                2.0,
+                0.0,
+            ))
+            .digits(1)
+            .build();
+        settings.bind("dash-gap-size", &dash_gap_row, "value").build();
+        settings.bind("dashed-border", &dash_gap_row, "sensitive").build();
+        border_group.add(&dash_gap_row);
+
         // glow toggle
         let glow_row = adw::SwitchRow::builder()
             .title("Glow Effect")

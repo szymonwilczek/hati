@@ -87,6 +87,17 @@
       <description>Spread radius of the glow in pixels</description>
     </key>
     
+    <key name="dashed-border" type="b">
+      <default>false</default>
+      <summary>Enable dashed inner border</summary>
+      <description>If true, the inner ring will be drawn with a dashed line style.</description>
+    </key>
+    <key name="dash-gap-size" type="d">
+      <default>3.0</default>
+      <summary>Size of gap between dashes</summary>
+      <description>Controls the density of the dashes. Smaller value = higher density.</description>
+    </key>
+    
     <key name="click-animations" type="b">
       <default>true</default>
       <summary>Enable click animations</summary>

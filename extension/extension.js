@@ -351,7 +351,9 @@ export default class HatiExtension extends Extension {
       glowRadius: glowRadius,
       glowSpread: glowSpread,
       clickAnimations: clickAnimations,
-      clickAnimationMode: clickAnimationMode,
+      clickAnimationMode: this._settings.get_string("click-animation-mode"),
+      dashedBorder: this._settings.get_boolean("dashed-border"),
+      dashGapSize: this._settings.get_double("dash-gap-size"),
     };
 
     // Canvas sizing and invalidation
@@ -554,18 +556,23 @@ export default class HatiExtension extends Extension {
     cr.stroke();
 
     // 2. DRAW INNER RING (User's opacity setting)
-    const { opacity } = this._drawSettings;
-    cr.setSourceRGBA(
-      drawColor.r,
-      drawColor.g,
-      drawColor.b,
-      opacity, // User's opacity from settings slider
-    );
+    const { opacity, dashedBorder, dashGapSize } = this._drawSettings;
+    cr.setSourceRGBA(drawColor.r, drawColor.g, drawColor.b, opacity);
     cr.setLineWidth(innerBorderWidth);
+
+    if (dashedBorder) {
+      const dashLen = 2.0;
+      const gapLen = Math.max(2.0, dashGapSize); // enforce min 2.0 to avoid solid look
+      cr.setDash([dashLen, gapLen], 0);
+    }
+
     drawRoundedRect(innerHalf, innerRadius);
     cr.stroke();
 
-    // Dispose context when done
+    // reset dash just in case
+    cr.setDash([], 0);
+
+    // dispose context when done
     cr.$dispose();
   }
 
