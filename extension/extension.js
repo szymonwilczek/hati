@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Clutter from "gi://Clutter";
+import Cogl from "gi://Cogl";
 import GLib from "gi://GLib";
+import GObject from "gi://GObject";
 import Meta from "gi://Meta";
 import Shell from "gi://Shell";
 import St from "gi://St";
@@ -11,6 +13,98 @@ import Cairo from "gi://cairo";
 
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
+
+// GLSL Shader for rounded corners clipping
+const SHADER_DECLARATIONS = `
+uniform vec4 bounds;
+uniform float clipRadius;
+uniform vec2 pixelStep;
+
+float getPointOpacity(vec2 p, float radius) {
+    float width = bounds.z;
+    float height = bounds.w;
+    
+    if (radius <= 0.0)
+        return 1.0;
+    
+    float centerLeft = radius;
+    float centerRight = width - radius;
+    float centerTop = radius;
+    float centerBottom = height - radius;
+    
+    vec2 center;
+    
+    if (p.x < centerLeft)
+        center.x = centerLeft;
+    else if (p.x > centerRight)
+        center.x = centerRight;
+    else
+        return 1.0;
+    
+    if (p.y < centerTop)
+        center.y = centerTop;
+    else if (p.y > centerBottom)
+        center.y = centerBottom;
+    else
+        return 1.0;
+    
+    vec2 delta = p - center;
+    float distSquared = dot(delta, delta);
+    
+    float outerRadius = radius + 0.5;
+    if (distSquared >= (outerRadius * outerRadius))
+        return 0.0;
+    
+    float innerRadius = radius - 0.5;
+    if (distSquared <= (innerRadius * innerRadius))
+        return 1.0;
+    
+    return outerRadius - sqrt(distSquared);
+}
+`;
+
+const SHADER_CODE = `
+vec2 p = cogl_tex_coord0_in.xy / pixelStep;
+float alpha = getPointOpacity(p, clipRadius);
+cogl_color_out *= alpha;
+`;
+
+// for rounded corners clipping
+const MagnifierClipEffect = GObject.registerClass(
+  {},
+  class MagnifierClipEffect extends Shell.GLSLEffect {
+    _init() {
+      super._init();
+      this._boundsLoc = this.get_uniform_location("bounds");
+      this._clipRadiusLoc = this.get_uniform_location("clipRadius");
+      this._pixelStepLoc = this.get_uniform_location("pixelStep");
+      console.log("[Hati] MagnifierClipEffect initialized");
+    }
+
+    vfunc_build_pipeline() {
+      this.add_glsl_snippet(
+        Cogl.SnippetHook.FRAGMENT,
+        SHADER_DECLARATIONS,
+        SHADER_CODE,
+        false,
+      );
+    }
+
+    updateUniforms(width, height, cornerRadius) {
+      const pixelStep = [1.0 / width, 1.0 / height];
+      const bounds = [0, 0, width, height];
+
+      this.set_uniform_float(this._boundsLoc, 4, bounds);
+      this.set_uniform_float(this._clipRadiusLoc, 1, [cornerRadius]);
+      this.set_uniform_float(this._pixelStepLoc, 2, pixelStep);
+      this.queue_repaint();
+
+      console.log(
+        `[Hati ClipEffect] Updated: ${width}x${height}, radius=${cornerRadius}`,
+      );
+    }
+  },
+);
 
 export default class HatiExtension extends Extension {
   constructor(metadata) {
@@ -115,45 +209,36 @@ export default class HatiExtension extends Extension {
 
     this._containerActor.add_child(this._canvas);
 
-    // Keep for compatibility
     this._highlightActor = this._canvas;
     this._outerRing = this._canvas;
     this._innerRing = null;
 
-    // MAGNIFIER
-    // group (Hardware Clipping container)
     this._magnifierGroup = new St.Widget({
-      style:
-        "background-color: black; border-radius: 999px; border: 2px solid white;",
+      style: "background-color: transparent;",
       visible: false,
       width: 300,
       height: 300,
       clip_to_allocation: true,
+      offscreen_redirect: Clutter.OffscreenRedirect.ALWAYS,
     });
 
     // magnifier activation state
     this._magnifierActive = false;
     this._magnifierKeyPressed = false;
 
+    // shader effect for rounded clipping
+    this._clipEffect = null;
+
     const monitor = Main.layoutManager.primaryMonitor;
 
     // LAYER 1: Background - try to get actual background content
     this._bgClone = null;
-    this._tryCreateBackgroundClone(monitor);
 
     // LAYER 2: All Windows (Dynamic) - updated each tick
     this._windowClones = [];
     this._lastWindowSnapshot = null;
 
     // LAYER 3: Panel (Top Bar) - always on top
-    const panelSource = Main.layoutManager.panelBox;
-    if (panelSource) {
-      this._panelClone = new Clutter.Clone({
-        source: panelSource,
-        reactive: false,
-      });
-      this._magnifierGroup.add_child(this._panelClone);
-    }
 
     Main.uiGroup.add_child(this._magnifierGroup); // hidden by default
 
@@ -309,6 +394,13 @@ export default class HatiExtension extends Extension {
         this._magnifierGroup.add_child(this._panelClone);
       }
     }
+
+    // create and apply rounded corners clipping effect
+    if (!this._clipEffect) {
+      this._clipEffect = new MagnifierClipEffect();
+      this._magnifierGroup.add_effect(this._clipEffect);
+      console.log("[Hati] Clip effect added to magnifier");
+    }
   }
 
   // MAGNIFIER: Deactivation
@@ -338,6 +430,12 @@ export default class HatiExtension extends Extension {
       this._magnifierGroup.remove_child(this._panelClone);
       this._panelClone.destroy();
       this._panelClone = null;
+    }
+
+    // Remove shader effect
+    if (this._clipEffect) {
+      this._magnifierGroup.remove_effect(this._clipEffect);
+      this._clipEffect = null;
     }
   }
 
@@ -574,6 +672,10 @@ export default class HatiExtension extends Extension {
     if (this._magnifierGroup && this._magnifierActive) {
       const size = this._settings.get_int("size") || 100;
       const zoom = this._settings.get_double("magnifier-zoom") || 2.0;
+      const borderWeight = this._settings.get_int("border-weight") || 4;
+      const gap = this._settings.get_double("gap") || 1.0;
+      const cornerRadius = this._settings.get_int("corner-radius") || 50;
+      const rotation = this._settings.get_int("rotation") || 0;
 
       // FULL DESKTOP CLONING
       // rebuild window clones periodically
@@ -585,12 +687,53 @@ export default class HatiExtension extends Extension {
         this._lastWindowRebuild = Date.now();
       }
 
-      const boxSize = size + 50;
-      this._magnifierGroup.set_size(boxSize, boxSize);
+      // MAGNIFIER SIZE: should fit to inner edge of OUTER ring
+      // Geometry: outerHalf = size/2, outer ring thickness = borderWeight
+      // Inner edge of outer ring = outerHalf - borderWeight
+      const outerHalf = size / 2;
+      const innerEdgeOfOuterRing = outerHalf - borderWeight;
+      const magnifierDiameter = Math.max(20, innerEdgeOfOuterRing * 2);
+
+      // calculate corner radius proportionally
+      const maxRadiusPx = magnifierDiameter / 2;
+      const magnifierRadius = Math.round(maxRadiusPx * (cornerRadius / 50.0));
+
+      // DEBUG LOGGING
+      if (!this._lastLogTime || Date.now() - this._lastLogTime > 2000) {
+        console.log(
+          `[Hati Magnifier] size=${size}, borderWeight=${borderWeight}, cornerRadius=${cornerRadius}`,
+        );
+        console.log(
+          `[Hati Magnifier] outerHalf=${outerHalf}, innerEdgeOfOuterRing=${innerEdgeOfOuterRing}`,
+        );
+        console.log(
+          `[Hati Magnifier] magnifierDiameter=${magnifierDiameter}, magnifierRadius=${magnifierRadius}`,
+        );
+        console.log(`[Hati Magnifier] rotation=${rotation}`);
+        this._lastLogTime = Date.now();
+      }
+
+      this._magnifierGroup.set_size(magnifierDiameter, magnifierDiameter);
+
+      // update shader effect uniforms for rounded clipping
+      if (this._clipEffect) {
+        this._clipEffect.updateUniforms(
+          magnifierDiameter,
+          magnifierDiameter,
+          magnifierRadius,
+        );
+      }
+
+      // apply rotation around center
+      this._magnifierGroup.set_pivot_point(0.5, 0.5);
+      this._magnifierGroup.set_rotation_angle(
+        Clutter.RotateAxis.Z_AXIS,
+        rotation,
+      );
 
       this._magnifierGroup.set_position(
-        this._currentX - boxSize / 2,
-        this._currentY - boxSize / 2,
+        this._currentX - magnifierDiameter / 2,
+        this._currentY - magnifierDiameter / 2,
       );
 
       // transform all layers
@@ -614,8 +757,8 @@ export default class HatiExtension extends Extension {
 
         clone.set_scale(zoom, zoom);
         clone.set_translation(
-          boxSize / 2 - (this._currentX - sourceX) * zoom,
-          boxSize / 2 - (this._currentY - sourceY) * zoom,
+          magnifierDiameter / 2 - (this._currentX - sourceX) * zoom,
+          magnifierDiameter / 2 - (this._currentY - sourceY) * zoom,
           0,
         );
       });
