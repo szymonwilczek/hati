@@ -295,10 +295,10 @@ impl HatiWindow {
             .subtitle("Gap between ticks (Lower = denser)")
             .adjustment(&gtk4::Adjustment::new(
                 settings.double("dash-gap-size"),
-                2.0,
-                20.0,
+                1.5,
+                5.0,
+                0.5,
                 1.0,
-                2.0,
                 0.0,
             ))
             .digits(1)

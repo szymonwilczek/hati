@@ -616,9 +616,28 @@ export default class HatiExtension extends Extension {
     cr.setLineWidth(innerBorderWidth);
 
     if (dashedBorder) {
-      const dashLen = 2.0;
-      const gapLen = Math.max(2.0, dashGapSize); // enforce min 2.0 to avoid solid look
-      cr.setDash([dashLen, gapLen], 0);
+      // calculate perimeter of the inner ring path
+      // Perimeter = 4 * StraightSegments + 4 * QuarterCircles
+      // StraightSegment = (2 * innerHalf) - (2 * innerRadius)
+      // QuarterCircle = (PI/2) * innerRadius
+      // Total = 4 * (2*innerHalf - 2*innerRadius) + 2*PI*innerRadius
+      const perimeter =
+        8 * (innerHalf - innerRadius) + 2 * Math.PI * innerRadius;
+
+      const dashLen = 2.0; // fixed tick width
+      const targetGap = Math.max(1.5, dashGapSize);
+      const targetUnit = dashLen + targetGap;
+
+      // find best fit integer count
+      let count = Math.round(perimeter / targetUnit);
+      if (count < 4) count = 4; // ensure minimal dash count
+
+      // recalculate exact gap to close the loop perfectly
+      const actualUnit = perimeter / count;
+      const actualGap = actualUnit - dashLen;
+
+      // apply dash
+      cr.setDash([dashLen, actualGap], 0);
     }
 
     drawRoundedRect(innerHalf, innerRadius);
