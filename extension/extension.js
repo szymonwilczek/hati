@@ -323,7 +323,11 @@ export default class HatiExtension extends Extension {
     console.log(`[Hati] Refresh Style: CornerRadius=${cornerRadius}, Shape=${shapeStr}, GlowRadius=${glowRadius}`);
 
     // Logic: Shape (Corner Radius driven)
-    let radius = `${cornerRadius}%`;
+    // Convert percentage (0-50) to pixels based on half-size (MAX radius)
+    // 50% corner radius = circle (radius = size/2)
+    const maxRadius = size / 2;
+    const radiusPx = Math.round(maxRadius * (cornerRadius / 50.0));
+    let radius = `${radiusPx}px`;
 
     // Logic: Glow
     let shadow = "none";
