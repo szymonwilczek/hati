@@ -254,6 +254,11 @@ export default class HatiExtension extends Extension {
     const cornerRadius = this._settings.get_int("corner-radius");
     const rotation = this._settings.get_int("rotation");
 
+    // Glow
+    const glow = this._settings.get_boolean("glow");
+    const glowRadius = this._settings.get_int("glow-radius");
+    const glowSpread = this._settings.get_int("glow-spread");
+
     // Shape
     const maxRadius = size / 2;
     const radiusPx = Math.round(maxRadius * (cornerRadius / 50.0));
@@ -268,10 +273,15 @@ export default class HatiExtension extends Extension {
       radiusPx: radiusPx,
       opacity: opacity,
       rotation: rotation,
+      glow: glow,
+      glowRadius: glowRadius,
+      glowSpread: glowSpread,
     };
 
     // Canvas sizing and invalidation
-    const padding = 20;
+    // Calculate padding based on glow to prevent clipping
+    const glowPadding = glow ? (glowRadius + glowSpread + 20) : 20;
+    const padding = glowPadding;
     const totalSize = size + (padding * 2);
 
     this._containerActor.set_size(totalSize, totalSize);
@@ -294,12 +304,13 @@ export default class HatiExtension extends Extension {
     cr.paint();
     cr.restore();
 
-    const { size, borderWeight, color, radiusPx, rotation, gap } = this._drawSettings;
+    const { size, borderWeight, color, radiusPx, rotation, gap, glow, glowRadius, glowSpread } = this._drawSettings;
 
     const centerX = width / 2;
     const centerY = height / 2;
     const rotationRad = (rotation || 0) * (Math.PI / 180);
 
+    // ... (transforms and helper function unchanged) ...
     // Apply Transformations (Rotate around center)
     cr.translate(centerX, centerY);
     cr.rotate(rotationRad);
@@ -337,6 +348,40 @@ export default class HatiExtension extends Extension {
     const innerHalf = outerHalf - outerBorderWidth - gap - (innerBorderWidth / 2);
     const outerRadius = radiusPx;
     const innerRadius = Math.max(0, radiusPx - outerBorderWidth - gap);
+
+    if (glow && glowRadius > 0) {
+      cr.save();
+      const glowPathHalfW = outerHalf; // Outer edge of outer ring
+
+      cr.rectangle(-width, -height, width * 2, height * 2); // Universe
+      drawRoundedRect(outerHalf - outerBorderWidth, outerRadius); // Inner edge of outer ring? 
+
+      // Draw Glow
+      cr.setSourceRGBA(
+        color.red / 255,
+        color.green / 255,
+        color.blue / 255,
+        (color.alpha * 0.5) / 10 // Low alpha for accumulation
+      );
+
+      // Simulate blur with multiple strokes
+      const steps = 10;
+      for (let i = 0; i < steps; i++) {
+        const spread = glowSpread + (glowRadius * (i / steps));
+        cr.setLineWidth(outerBorderWidth + spread);
+        drawRoundedRect(outerHalf - outerBorderWidth / 2, outerRadius);
+        cr.stroke();
+      }
+
+      // Clip Inner Region (Cleanup)
+      cr.setOperator(0); // CLEAR
+      cr.setSourceRGBA(0, 0, 0, 1);
+      cr.setLineWidth(1);
+      drawRoundedRect(outerHalf - outerBorderWidth, Math.max(0, outerRadius - outerBorderWidth));
+      cr.fill(); // This eats the inner bleed
+
+      cr.restore(); // Restore context (operator, etc)
+    }
 
     // 1. DRAW OUTER RING (100% Opaque)
     cr.setSourceRGBA(
