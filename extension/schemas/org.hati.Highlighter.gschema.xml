@@ -90,7 +90,17 @@
     <key name="click-animations" type="b">
       <default>true</default>
       <summary>Enable click animations</summary>
-      <description>Show ripple effect when clicking</description>
+      <description>Show ripple/directional effect when clicking</description>
+    </key>
+
+    <key name="click-animation-mode" type="s">
+      <choices>
+        <choice value='directional'/>
+        <choice value='ripple'/>
+      </choices>
+      <default>'directional'</default>
+      <summary>Click animation mode</summary>
+      <description>Style of click animation (directional or ripple)</description>
     </key>
     
     <key name="auto-hide" type="b">

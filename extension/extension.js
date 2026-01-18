@@ -87,7 +87,7 @@ export default class HatiExtension extends Extension {
       y_align: Clutter.ActorAlign.CENTER,
     });
 
-    this._canvas.connect('repaint', (area) => {
+    this._canvas.connect("repaint", (area) => {
       this._drawHighlight(area);
     });
 
@@ -148,11 +148,12 @@ export default class HatiExtension extends Extension {
     }
   }
 
-  _startCursorTracking() { }
-  _stopCursorTracking() { }
+  _startCursorTracking() {}
+  _stopCursorTracking() {}
 
   _tick() {
-    if (!this._containerActor || !this._highlightActor) return Clutter.TICK_STOP;
+    if (!this._containerActor || !this._highlightActor)
+      return Clutter.TICK_STOP;
 
     const [pointerX, pointerY] = global.get_pointer();
     const containerWidth = this._containerActor.get_width();
@@ -179,9 +180,76 @@ export default class HatiExtension extends Extension {
       this._velocityY = 0;
     }
 
+    // --- Click Animation Logic ---
+    if (!this._clickState) {
+      this._clickState = {
+        active: false,
+        button: null, // 'left' / 'right'
+        progress: 0.0, // 0.0 to 1.0
+        closing: false, // true if releasing button
+      };
+    }
+
+    // detect button state from mask
+    // global.get_pointer returns [x, y, mask]
+    // mask & Clutter.ModifierType.BUTTON1_MASK (Left)
+    // mask & Clutter.ModifierType.BUTTON3_MASK (Right) usually (in my system BUTTON3 is middle - scroll - click)
+    const [, , mask] = global.get_pointer();
+    const leftPressed = (mask & Clutter.ModifierType.BUTTON1_MASK) !== 0;
+    const rightPressed = (mask & Clutter.ModifierType.BUTTON3_MASK) !== 0;
+
+    const anyPressed = leftPressed || rightPressed;
+    const pressedButton = leftPressed ? "left" : rightPressed ? "right" : null;
+
+    // react to state changes
+    if (anyPressed && !this._clickState.active) {
+      // START CLICK
+      this._clickState.active = true;
+      this._clickState.button = pressedButton;
+      this._clickState.progress = 0.0;
+      this._clickState.closing = false;
+      this._canvas.queue_repaint();
+    } else if (
+      !anyPressed &&
+      this._clickState.active &&
+      !this._clickState.closing
+    ) {
+      // RELEASE CLICK
+      this._clickState.closing = true;
+    }
+
+    // animate progress
+    if (this._clickState.active) {
+      const speed = 0.15; // approx 60fps -> 0.15 * 60 = 9.0/sec?? too fast. 0.15 per tick(16ms) -> ~6 frames to full - fast
+
+      if (!this._clickState.closing) {
+        // pressing down: animate to 1.0
+        if (this._clickState.progress < 1.0) {
+          this._clickState.progress = Math.min(
+            1.0,
+            this._clickState.progress + speed,
+          );
+          this._canvas.queue_repaint();
+        }
+      } else {
+        // released: animate back to 0.0
+        if (this._clickState.progress > 0.0) {
+          this._clickState.progress = Math.max(
+            0.0,
+            this._clickState.progress - speed,
+          );
+          this._canvas.queue_repaint();
+        } else {
+          // finished closing
+          this._clickState.active = false;
+          this._clickState.button = null;
+        }
+      }
+    }
+
     this._containerActor.set_position(
       this._currentX - containerWidth / 2,
-      this._currentY - containerHeight / 2
+      this._currentY - containerHeight / 2,
     );
 
     // Edge Squish
@@ -189,9 +257,9 @@ export default class HatiExtension extends Extension {
     if (!monitor) return Clutter.TICK_CONTINUE;
 
     const distLeft = this._currentX - monitor.x;
-    const distRight = (monitor.x + monitor.width) - this._currentX;
+    const distRight = monitor.x + monitor.width - this._currentX;
     const distTop = this._currentY - monitor.y;
-    const distBottom = (monitor.y + monitor.height) - this._currentY;
+    const distBottom = monitor.y + monitor.height - this._currentY;
 
     const size = this._settings.get_int("size");
     const radius = size / 2;
@@ -214,7 +282,7 @@ export default class HatiExtension extends Extension {
     return Clutter.TICK_CONTINUE;
   }
 
-  _updateHighlightPosition() { }
+  _updateHighlightPosition() {}
 
   _toggleHighlight() {
     if (this._settings.get_boolean("enabled")) {
@@ -259,6 +327,12 @@ export default class HatiExtension extends Extension {
     const glowRadius = this._settings.get_int("glow-radius");
     const glowSpread = this._settings.get_int("glow-spread");
 
+    // Click Animations
+    const clickAnimations = this._settings.get_boolean("click-animations");
+    const clickAnimationMode = this._settings.get_string(
+      "click-animation-mode",
+    );
+
     // Shape
     const maxRadius = size / 2;
     const radiusPx = Math.round(maxRadius * (cornerRadius / 50.0));
@@ -276,13 +350,15 @@ export default class HatiExtension extends Extension {
       glow: glow,
       glowRadius: glowRadius,
       glowSpread: glowSpread,
+      clickAnimations: clickAnimations,
+      clickAnimationMode: clickAnimationMode,
     };
 
     // Canvas sizing and invalidation
     // Calculate padding based on glow to prevent clipping
-    const glowPadding = glow ? (glowRadius + glowSpread + 20) : 20;
+    const glowPadding = glow ? glowRadius + glowSpread + 20 : 20;
     const padding = glowPadding;
-    const totalSize = size + (padding * 2);
+    const totalSize = size + padding * 2;
 
     this._containerActor.set_size(totalSize, totalSize);
     this._canvas.set_size(totalSize, totalSize);
@@ -304,15 +380,94 @@ export default class HatiExtension extends Extension {
     cr.paint();
     cr.restore();
 
-    const { size, borderWeight, color, radiusPx, rotation, gap, glow, glowRadius, glowSpread } = this._drawSettings;
+    const {
+      size,
+      borderWeight,
+      color,
+      radiusPx,
+      rotation,
+      gap,
+      glow,
+      glowRadius,
+      glowSpread,
+      clickAnimations,
+      clickAnimationMode,
+    } = this._drawSettings;
+
+    // --- Animation State Calculation ---
+    let animScaleX = 1.0;
+    let animScaleY = 1.0;
+    let animTranslateX = 0;
+    let drawColor = {
+      r: color.red / 255,
+      g: color.green / 255,
+      b: color.blue / 255,
+      a: color.alpha,
+    }; // default
+
+    if (
+      clickAnimations &&
+      this._clickState &&
+      (this._clickState.active || this._clickState.progress > 0)
+    ) {
+      const progress = this._clickState.progress;
+      const button = this._clickState.button; // 'left' or 'right'
+
+      // 1. Color Blending
+      // Target colors: Left = Blue (0.2, 0.6, 1.0), Right = Red (1.0, 0.2, 0.2)
+      let targetR = 0.2,
+        targetG = 0.6,
+        targetB = 1.0; // Blueish
+      if (button === "right") {
+        targetR = 1.0;
+        targetG = 0.2;
+        targetB = 0.2; // Reddish
+      }
+
+      // Simple blend: current * (1-p) + target * p
+      const blend = Math.min(1.0, progress * 0.8); // Blend factor
+
+      drawColor.r = drawColor.r * (1 - blend) + targetR * blend;
+      drawColor.g = drawColor.g * (1 - blend) + targetG * blend;
+      drawColor.b = drawColor.b * (1 - blend) + targetB * blend;
+      // Alpha remains user setting usually, or we can boost it? Keep user setting.
+
+      // 2. Shape Deformation
+      if (clickAnimationMode === "ripple") {
+        // Ripple: Squeeze to center
+        // Scale down to 80% at peak
+        const scale = 1.0 - progress * 0.2;
+        animScaleX = scale;
+        animScaleY = scale;
+      } else {
+        // Directional: Squeeze to side
+        // Scale width down to 70%
+        animScaleX = 1.0 - progress * 0.3;
+        // Shift to keep anchor
+        const shift = ((size * 0.3) / 2) * progress; // Shift by half the lost width
+        if (button === "left") {
+          // Squeeze to Left -> Move Left (visual squeeze towards left edge)
+          animTranslateX = -shift;
+        } else {
+          // Squeeze to Right -> Move Right
+          animTranslateX = shift;
+        }
+      }
+    }
+    // --- End Animation Calculation ---
 
     const centerX = width / 2;
     const centerY = height / 2;
     const rotationRad = (rotation || 0) * (Math.PI / 180);
 
-    // ... (transforms and helper function unchanged) ...
-    // Apply Transformations (Rotate around center)
+    // Apply Transformations
     cr.translate(centerX, centerY);
+
+    // Apply Click Animation Transforms (Before rotation, so they are Screen-Aligned)
+    cr.translate(animTranslateX, 0);
+    cr.scale(animScaleX, animScaleY);
+
+    // Apply Shape Rotation
     cr.rotate(rotationRad);
 
     // Helper function to draw rounded rectangle path (centered at 0,0)
@@ -328,7 +483,7 @@ export default class HatiExtension extends Extension {
         cr.arc(x + w - r, y + r, r, -Math.PI / 2, 0);
         cr.arc(x + w - r, y + h - r, r, 0, Math.PI / 2);
         cr.arc(x + r, y + h - r, r, Math.PI / 2, Math.PI);
-        cr.arc(x + r, y + r, r, Math.PI, 3 * Math.PI / 2);
+        cr.arc(x + r, y + r, r, Math.PI, (3 * Math.PI) / 2);
       } else {
         cr.rectangle(x, y, w, h);
       }
@@ -345,29 +500,30 @@ export default class HatiExtension extends Extension {
 
     const outerHalf = size / 2;
     // Inner ring starts where outer ring ends plus gap
-    const innerHalf = outerHalf - outerBorderWidth - gap - (innerBorderWidth / 2);
+    const innerHalf = outerHalf - outerBorderWidth - gap - innerBorderWidth / 2;
     const outerRadius = radiusPx;
     const innerRadius = Math.max(0, radiusPx - outerBorderWidth - gap);
 
+    // 0. GLOW EFFECT (Behind everything)
     if (glow && glowRadius > 0) {
       cr.save();
       const glowPathHalfW = outerHalf; // Outer edge of outer ring
 
       cr.rectangle(-width, -height, width * 2, height * 2); // Universe
-      drawRoundedRect(outerHalf - outerBorderWidth, outerRadius); // Inner edge of outer ring? 
+      drawRoundedRect(outerHalf - outerBorderWidth, outerRadius); // Inner edge of outer ring?
 
-      // Draw Glow
+      // Draw Glow with BLENDED color
       cr.setSourceRGBA(
-        color.red / 255,
-        color.green / 255,
-        color.blue / 255,
-        (color.alpha * 0.5) / 10 // Low alpha for accumulation
+        drawColor.r,
+        drawColor.g,
+        drawColor.b,
+        (drawColor.a * 0.5) / 10,
       );
 
       // Simulate blur with multiple strokes
       const steps = 10;
       for (let i = 0; i < steps; i++) {
-        const spread = glowSpread + (glowRadius * (i / steps));
+        const spread = glowSpread + glowRadius * (i / steps);
         cr.setLineWidth(outerBorderWidth + spread);
         drawRoundedRect(outerHalf - outerBorderWidth / 2, outerRadius);
         cr.stroke();
@@ -377,7 +533,10 @@ export default class HatiExtension extends Extension {
       cr.setOperator(0); // CLEAR
       cr.setSourceRGBA(0, 0, 0, 1);
       cr.setLineWidth(1);
-      drawRoundedRect(outerHalf - outerBorderWidth, Math.max(0, outerRadius - outerBorderWidth));
+      drawRoundedRect(
+        outerHalf - outerBorderWidth,
+        Math.max(0, outerRadius - outerBorderWidth),
+      );
       cr.fill(); // This eats the inner bleed
 
       cr.restore(); // Restore context (operator, etc)
@@ -385,10 +544,10 @@ export default class HatiExtension extends Extension {
 
     // 1. DRAW OUTER RING (100% Opaque)
     cr.setSourceRGBA(
-      color.red / 255,
-      color.green / 255,
-      color.blue / 255,
-      1.0 // Always 100% opaque
+      drawColor.r,
+      drawColor.g,
+      drawColor.b,
+      1.0, // Always 100% opaque
     );
     cr.setLineWidth(outerBorderWidth);
     drawRoundedRect(outerHalf - outerBorderWidth / 2, outerRadius);
@@ -397,10 +556,10 @@ export default class HatiExtension extends Extension {
     // 2. DRAW INNER RING (User's opacity setting)
     const { opacity } = this._drawSettings;
     cr.setSourceRGBA(
-      color.red / 255,
-      color.green / 255,
-      color.blue / 255,
-      opacity // User's opacity from settings slider
+      drawColor.r,
+      drawColor.g,
+      drawColor.b,
+      opacity, // User's opacity from settings slider
     );
     cr.setLineWidth(innerBorderWidth);
     drawRoundedRect(innerHalf, innerRadius);
@@ -412,10 +571,14 @@ export default class HatiExtension extends Extension {
 
   _getShapeValue(shapeString) {
     switch (shapeString) {
-      case "circle": return 0.0;
-      case "squircle": return 1.0;
-      case "square": return 2.0;
-      default: return 0.0;
+      case "circle":
+        return 0.0;
+      case "squircle":
+        return 1.0;
+      case "square":
+        return 2.0;
+      default:
+        return 0.0;
     }
   }
 

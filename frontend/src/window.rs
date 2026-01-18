@@ -324,6 +324,32 @@ impl HatiWindow {
         settings.bind("click-animations", &click_animations_row, "active").build();
         behavior_group.add(&click_animations_row);
 
+        // Animation Mode
+        let animation_mode_row = adw::ComboRow::builder()
+            .title("Animation Mode")
+            .subtitle("Style of click effect")
+            .model(&gtk4::StringList::new(&["Directional", "Ripple"]))
+            .build();
+        
+        let current_mode = settings.string("click-animation-mode");
+        animation_mode_row.set_selected(match current_mode.as_str() {
+            "directional" => 0,
+            "ripple" => 1,
+            _ => 0,
+        });
+
+        animation_mode_row.connect_selected_notify(clone!(@weak settings => move |row| {
+            let mode = match row.selected() {
+                0 => "directional",
+                1 => "ripple",
+                _ => "directional",
+            };
+            settings.set_string("click-animation-mode", mode).unwrap();
+        }));
+        
+        settings.bind("click-animations", &animation_mode_row, "sensitive").build();
+        behavior_group.add(&animation_mode_row);
+
         // auto-hide toggle
         let auto_hide_row = adw::SwitchRow::builder()
             .title("Auto-hide")
