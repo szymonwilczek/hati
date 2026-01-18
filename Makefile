@@ -32,6 +32,7 @@ deploy-remote:
 
 deploy-frontend-remote: build-frontend
 	@echo "🚀 Deploying frontend binary to $(REMOTE_HOST)..."
+	@ssh $(REMOTE_HOST) "killall -q hati || true"
 	@ssh $(REMOTE_HOST) "mkdir -p .local/bin"
 	@scp $(FRONTEND_DIR)/target/release/hati $(REMOTE_HOST):.local/bin/
 	@echo "✅ Frontend deployed. Run 'hati' on remote host to configure."
