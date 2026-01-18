@@ -222,6 +222,13 @@ export default class HatiExtension extends Extension {
       offscreen_redirect: Clutter.OffscreenRedirect.ALWAYS,
     });
 
+    // CONTENT GROUP: will hold the clones and apply counter-rotation
+    this._contentGroup = new St.Widget({
+      width: 300,
+      height: 300,
+    });
+    this._magnifierGroup.add_child(this._contentGroup);
+
     // magnifier activation state
     this._magnifierActive = false;
     this._magnifierKeyPressed = false;
@@ -391,7 +398,7 @@ export default class HatiExtension extends Extension {
           source: panelSource,
           reactive: false,
         });
-        this._magnifierGroup.add_child(this._panelClone);
+        this._contentGroup.add_child(this._panelClone);
       }
     }
 
@@ -413,21 +420,21 @@ export default class HatiExtension extends Extension {
 
     // destroy all clones to free resources
     if (this._bgClone) {
-      this._magnifierGroup.remove_child(this._bgClone);
+      this._contentGroup.remove_child(this._bgClone);
       this._bgClone.destroy();
       this._bgClone = null;
     }
 
     this._windowClones.forEach((clone) => {
       if (clone) {
-        this._magnifierGroup.remove_child(clone);
+        this._contentGroup.remove_child(clone);
         clone.destroy();
       }
     });
     this._windowClones = [];
 
     if (this._panelClone) {
-      this._magnifierGroup.remove_child(this._panelClone);
+      this._contentGroup.remove_child(this._panelClone);
       this._panelClone.destroy();
       this._panelClone = null;
     }
@@ -455,7 +462,7 @@ export default class HatiExtension extends Extension {
             reactive: false,
           });
           this._bgClone._sourceActor = { x: 0, y: 0 }; // background is at 0,0
-          this._magnifierGroup.insert_child_at_index(this._bgClone, 0);
+          this._contentGroup.insert_child_at_index(this._bgClone, 0);
           console.log(`[Hati] Background clone created successfully!`);
           return;
         }
@@ -475,7 +482,7 @@ export default class HatiExtension extends Extension {
             reactive: false,
           });
           this._bgClone._sourceActor = { x: 0, y: 0 };
-          this._magnifierGroup.insert_child_at_index(this._bgClone, 0);
+          this._contentGroup.insert_child_at_index(this._bgClone, 0);
           console.log(`[Hati] Background clone (fallback) created!`);
           return;
         }
@@ -494,7 +501,7 @@ export default class HatiExtension extends Extension {
     // clean up old clones
     this._windowClones.forEach((clone) => {
       if (clone) {
-        this._magnifierGroup.remove_child(clone);
+        this._contentGroup.remove_child(clone);
         clone.destroy();
       }
     });
@@ -534,7 +541,7 @@ export default class HatiExtension extends Extension {
 
         // insert above background, below panel
         const insertIndex = this._bgClone ? 1 : 0;
-        this._magnifierGroup.insert_child_at_index(
+        this._contentGroup.insert_child_at_index(
           clone,
           insertIndex + this._windowClones.length,
         );
@@ -724,11 +731,20 @@ export default class HatiExtension extends Extension {
         );
       }
 
-      // apply rotation around center
+      // apply rotation around center (frame rotates clockwise)
       this._magnifierGroup.set_pivot_point(0.5, 0.5);
       this._magnifierGroup.set_rotation_angle(
         Clutter.RotateAxis.Z_AXIS,
         rotation,
+      );
+
+      // update content group size and apply counter-rotation (content rotates counter-clockwise)
+      // this keeps the content upright while the frame rotates
+      this._contentGroup.set_size(magnifierDiameter, magnifierDiameter);
+      this._contentGroup.set_pivot_point(0.5, 0.5);
+      this._contentGroup.set_rotation_angle(
+        Clutter.RotateAxis.Z_AXIS,
+        -rotation,
       );
 
       this._magnifierGroup.set_position(
