@@ -15,6 +15,7 @@ export default class HatiExtension extends Extension {
   constructor(metadata) {
     super(metadata);
     this._highlightActor = null;
+    this._glowActor = null;
     this._shaderEffect = null;
     this._updateId = null;
     this._settings = null;
@@ -90,14 +91,24 @@ export default class HatiExtension extends Extension {
       y_align: Clutter.ActorAlign.CENTER,
     });
 
-    // 2. Inner Highlight Actor (The visible ring/glow)
+    // 2. Glow Actor (Opaque Border + Outer Glow)
+    this._glowActor = new St.Bin({
+      style_class: "hati-glow",
+      reactive: false,
+      can_focus: false,
+      x_align: Clutter.ActorAlign.CENTER,
+      y_align: Clutter.ActorAlign.CENTER,
+    });
+
+    // 3. Inner Highlight Actor (Semi-transparent Border)
     this._highlightActor = new St.Bin({
       style_class: "hati-highlight",
       reactive: false,
       can_focus: false,
     });
 
-    this._containerActor.set_child(this._highlightActor);
+    this._glowActor.set_child(this._highlightActor);
+    this._containerActor.set_child(this._glowActor);
 
     // State for Physics
     this._currentX = 0;
@@ -153,6 +164,7 @@ export default class HatiExtension extends Extension {
       Main.uiGroup.remove_child(this._containerActor);
       this._containerActor.destroy();
       this._containerActor = null;
+      this._glowActor = null; // Cleanup
       this._highlightActor = null;
     }
   }
@@ -253,8 +265,8 @@ export default class HatiExtension extends Extension {
     scaleX = Math.pow(scaleX, 0.5);
     scaleY = Math.pow(scaleY, 0.5);
 
-    // Apply scaling to INNER actor (Visuals only)
-    this._highlightActor.set_scale(scaleX, scaleY);
+    // Apply scaling to GLOW actor (Parent of Highlight)
+    this._glowActor.set_scale(scaleX, scaleY);
 
     return Clutter.TICK_CONTINUE;
   }
@@ -306,7 +318,7 @@ export default class HatiExtension extends Extension {
   }
 
   _refreshStyle() {
-    if (!this._highlightActor || !this._containerActor) return;
+    if (!this._highlightActor || !this._containerActor || !this._glowActor) return;
 
     // Fetch Settings
     const size = this._settings.get_int("size");
@@ -314,54 +326,86 @@ export default class HatiExtension extends Extension {
     const color = this._parseColor(colorStr);
     const borderWeight = this._settings.get_int("border-weight");
     const opacity = this._settings.get_double("opacity");
-    const shapeStr = this._settings.get_string("shape"); // Kept for shader compat if needed
     const glow = this._settings.get_boolean("glow");
     const cornerRadius = this._settings.get_int("corner-radius");
     const glowRadius = this._settings.get_int("glow-radius");
     const glowSpread = this._settings.get_int("glow-spread");
 
-    console.log(`[Hati] Refresh Style: CornerRadius=${cornerRadius}, Shape=${shapeStr}, GlowRadius=${glowRadius}`);
-
     // Logic: Shape (Corner Radius driven)
-    // Convert percentage (0-50) to pixels based on half-size (MAX radius)
-    // 50% corner radius = circle (radius = size/2)
     const maxRadius = size / 2;
     const radiusPx = Math.round(maxRadius * (cornerRadius / 50.0));
     let radius = `${radiusPx}px`;
 
-    // Logic: Glow
+    // Calculate Colors
+    // Outer Ring: OPAQUE (alpha 1.0)
+    // Inner Ring: SEMI-TRANSPARENT (user's alpha)
+
+    // Actually, user's color might have alpha. 
+    // The requirement: "Outer is completely opaque", "Inner is semi-transparent"
+    // Let's force Outer Alpha to 1.0 (or at least high)
+    // And Inner Alpha to setting value (default 0.7)
+
+    const opaqueColor = `rgba(${color.red}, ${color.green}, ${color.blue}, 1.0)`;
+    const innerColor = `rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha})`;
+
+    // Logic: Glow (on Outer Opaque Ring)
     let shadow = "none";
     let padding = 0;
 
     if (glow) {
-      // Glow driven by settings
-      // color is an object {red, green, blue, alpha}
-      shadow = `0 0 ${glowRadius}px ${glowSpread}px rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha})`;
-      // Dynamic padding based on glow spread + fuzziness
+      shadow = `0 0 ${glowRadius}px ${glowSpread}px ${opaqueColor}`; // Use opaque color for glow? Or inner color? Usually Glow matches source.
       padding = glowSpread + glowRadius + 10;
     } else {
-      padding = 10; // Basic margin
+      padding = 10;
     }
 
-    // 1. Style the Inner Actor (Visuals)
-    this._highlightActor.set_size(size, size);
+    // 1. Style Glow Actor (Outer Opaque Ring + Glow)
+    // We want a THIN opaque border (e.g. 2px or 1px)
+    const outerBorderWidth = 2;
+    const innerBorderWidth = Math.max(0, borderWeight - outerBorderWidth);
 
-    // Reset Pivot Point to Center for Scaling
-    this._highlightActor.set_pivot_point(0.5, 0.5);
-
-    this._highlightActor.set_style(`
+    this._glowActor.set_size(size, size);
+    this._glowActor.set_pivot_point(0.5, 0.5);
+    this._glowActor.set_style(`
        background-color: transparent;
-       border: ${borderWeight}px solid rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha});
+       border: ${outerBorderWidth}px solid ${opaqueColor};
        border-radius: ${radius};
        box-shadow: ${shadow};
     `);
 
-    // 2. Size the Container (Geometry)
-    // Container must be larger than Inner + Shadow
+    // 2. Style Highlight Actor (Inner Semi-Transparent Ring)
+    // It should fill the parent?
+    // If we set size, we need to account for parent's border?
+    // St.Bin with Clutter.Align.FILL should handle it if specific size not set?
+    // To match the curvature perfectly:
+    // Inner Radius = Outer Radius - Distance (Border Width)
+    const innerRadiusPx = Math.max(0, radiusPx - outerBorderWidth);
+    const innerRadius = `${innerRadiusPx}px`;
+
+    // Inner Size = Outer Size - (2 * Border Width)
+    const innerSize = Math.max(0, size - (outerBorderWidth * 2));
+
+    this._highlightActor.set_size(innerSize, innerSize);
+
+    // Reset margins just in case
+    this._highlightActor.set_margin_top(0);
+    this._highlightActor.set_margin_bottom(0);
+    this._highlightActor.set_margin_left(0);
+    this._highlightActor.set_margin_right(0);
+
+    this._highlightActor.set_style(`
+        background-color: transparent;
+        border: ${innerBorderWidth}px solid ${innerColor};
+        border-radius: ${innerRadius}; 
+    `);
+
+
+
+    // 3. Size the Container
     const totalSize = size + (padding * 2);
     this._containerActor.set_size(totalSize, totalSize);
 
-    // 3. Opacity (applied to container to affect both)
+    // 4. Opacity
     this._containerActor.set_opacity(Math.floor(opacity * 255));
   }
 
