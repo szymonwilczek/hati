@@ -120,6 +120,51 @@ export default class HatiExtension extends Extension {
     this._outerRing = this._canvas;
     this._innerRing = null;
 
+    // MAGNIFIER
+    // group (Hardware Clipping container)
+    this._magnifierGroup = new St.Widget({
+      style:
+        "background-color: black; border-radius: 999px; border: 2px solid white;",
+      visible: false,
+      width: 300,
+      height: 300,
+      clip_to_allocation: true,
+    });
+
+    // magnifier activation state
+    this._magnifierActive = false;
+    this._magnifierKeyPressed = false;
+
+    const monitor = Main.layoutManager.primaryMonitor;
+
+    // LAYER 1: Background - try to get actual background content
+    this._bgClone = null;
+    this._tryCreateBackgroundClone(monitor);
+
+    // LAYER 2: All Windows (Dynamic) - updated each tick
+    this._windowClones = [];
+    this._lastWindowSnapshot = null;
+
+    // LAYER 3: Panel (Top Bar) - always on top
+    const panelSource = Main.layoutManager.panelBox;
+    if (panelSource) {
+      this._panelClone = new Clutter.Clone({
+        source: panelSource,
+        reactive: false,
+      });
+      this._magnifierGroup.add_child(this._panelClone);
+    }
+
+    Main.uiGroup.add_child(this._magnifierGroup); // hidden by default
+
+    // magnifier activation
+    this._stageEventId = global.stage.connect(
+      "captured-event",
+      (actor, event) => {
+        return this._onStageEvent(event);
+      },
+    );
+
     // State for Physics
     this._currentX = 0;
     this._currentY = 0;
@@ -162,16 +207,246 @@ export default class HatiExtension extends Extension {
         this._tickId = 0;
       }
 
+      // disconnect stage event handler
+      if (this._stageEventId) {
+        global.stage.disconnect(this._stageEventId);
+        this._stageEventId = null;
+      }
+
       Main.uiGroup.remove_child(this._containerActor);
       this._containerActor.destroy();
       this._containerActor = null;
+
+      if (this._magnifierGroup) {
+        Main.uiGroup.remove_child(this._magnifierGroup);
+        this._magnifierGroup.destroy();
+        this._magnifierGroup = null;
+      }
+      this._magnifierClone = null;
+
+      if (this._magnifierGhost) {
+        Main.uiGroup.remove_child(this._magnifierGhost);
+        this._magnifierGhost.destroy();
+        this._magnifierGhost = null;
+      }
+
       this._outerRing = null;
       this._innerRing = null;
     }
   }
 
+  // MAGNIFIER: Key Event Handler
+  _onStageEvent(event) {
+    // only handle key events
+    const type = event.type();
+    if (
+      type !== Clutter.EventType.KEY_PRESS &&
+      type !== Clutter.EventType.KEY_RELEASE
+    ) {
+      return Clutter.EVENT_PROPAGATE;
+    }
+
+    const activationKey =
+      this._settings.get_string("magnifier-key") || "Shift_L";
+    const keyName = event.get_key_symbol();
+
+    const keyMap = {
+      Shift_L: Clutter.KEY_Shift_L,
+      Shift_R: Clutter.KEY_Shift_R,
+      Control_L: Clutter.KEY_Control_L,
+      Control_R: Clutter.KEY_Control_R,
+      Alt_L: Clutter.KEY_Alt_L,
+      Alt_R: Clutter.KEY_Alt_R,
+      Super_L: Clutter.KEY_Super_L,
+      Super_R: Clutter.KEY_Super_R,
+    };
+
+    const targetKey = keyMap[activationKey] || Clutter.KEY_Shift_L;
+
+    if (keyName !== targetKey) {
+      return Clutter.EVENT_PROPAGATE;
+    }
+
+    if (type === Clutter.EventType.KEY_PRESS && !this._magnifierKeyPressed) {
+      // KEY DOWN - activate magnifier
+      this._magnifierKeyPressed = true;
+      this._activateMagnifier();
+      return Clutter.EVENT_STOP;
+    } else if (
+      type === Clutter.EventType.KEY_RELEASE &&
+      this._magnifierKeyPressed
+    ) {
+      // KEY UP - deactivate magnifier
+      this._magnifierKeyPressed = false;
+      this._deactivateMagnifier();
+      return Clutter.EVENT_STOP;
+    }
+
+    return Clutter.EVENT_PROPAGATE;
+  }
+
+  // MAGNIFIER: Activation
+  _activateMagnifier() {
+    if (this._magnifierActive) return;
+
+    console.log("[Hati] Magnifier ACTIVATED");
+    this._magnifierActive = true;
+    this._magnifierGroup.visible = true;
+
+    // create clones on-demand
+    const monitor = Main.layoutManager.primaryMonitor;
+    this._tryCreateBackgroundClone(monitor);
+    this._rebuildWindowClones();
+
+    // create panel clone if not exists
+    if (!this._panelClone) {
+      const panelSource = Main.layoutManager.panelBox;
+      if (panelSource) {
+        this._panelClone = new Clutter.Clone({
+          source: panelSource,
+          reactive: false,
+        });
+        this._magnifierGroup.add_child(this._panelClone);
+      }
+    }
+  }
+
+  // MAGNIFIER: Deactivation
+  _deactivateMagnifier() {
+    if (!this._magnifierActive) return;
+
+    console.log("[Hati] Magnifier DEACTIVATED");
+    this._magnifierActive = false;
+    this._magnifierGroup.visible = false;
+
+    // destroy all clones to free resources
+    if (this._bgClone) {
+      this._magnifierGroup.remove_child(this._bgClone);
+      this._bgClone.destroy();
+      this._bgClone = null;
+    }
+
+    this._windowClones.forEach((clone) => {
+      if (clone) {
+        this._magnifierGroup.remove_child(clone);
+        clone.destroy();
+      }
+    });
+    this._windowClones = [];
+
+    if (this._panelClone) {
+      this._magnifierGroup.remove_child(this._panelClone);
+      this._panelClone.destroy();
+      this._panelClone = null;
+    }
+  }
+
   _startCursorTracking() {}
   _stopCursorTracking() {}
+
+  // MAGNIFIER HELPER: background clone
+  _tryCreateBackgroundClone(monitor) {
+    try {
+      const bgManagers = Main.layoutManager._bgManagers;
+      if (bgManagers && bgManagers.length > 0) {
+        // get the background actor for primary monitor
+        const bgManager = bgManagers[0];
+        if (bgManager && bgManager.backgroundActor) {
+          this._bgClone = new Clutter.Clone({
+            source: bgManager.backgroundActor,
+            reactive: false,
+          });
+          this._bgClone._sourceActor = { x: 0, y: 0 }; // background is at 0,0
+          this._magnifierGroup.insert_child_at_index(this._bgClone, 0);
+          console.log(`[Hati] Background clone created successfully!`);
+          return;
+        }
+      }
+    } catch (e) {
+      console.log(`[Hati] Failed to get background via bgManagers: ${e}`);
+    }
+
+    // fallback: try layoutManager.backgroundGroup first child
+    try {
+      const bgGroup = Main.layoutManager.backgroundGroup;
+      if (bgGroup && bgGroup.get_n_children() > 0) {
+        const bgActor = bgGroup.get_child_at_index(0);
+        if (bgActor) {
+          this._bgClone = new Clutter.Clone({
+            source: bgActor,
+            reactive: false,
+          });
+          this._bgClone._sourceActor = { x: 0, y: 0 };
+          this._magnifierGroup.insert_child_at_index(this._bgClone, 0);
+          console.log(`[Hati] Background clone (fallback) created!`);
+          return;
+        }
+      }
+    } catch (e) {
+      console.log(`[Hati] Background fallback also failed: ${e}`);
+    }
+
+    console.log(`[Hati] No background clone could be created`);
+  }
+
+  // MAGNIFIER HELPER: Rebuild All Window Clones
+  _rebuildWindowClones() {
+    if (!this._magnifierGroup) return;
+
+    // clean up old clones
+    this._windowClones.forEach((clone) => {
+      if (clone) {
+        this._magnifierGroup.remove_child(clone);
+        clone.destroy();
+      }
+    });
+    this._windowClones = [];
+
+    // get all windows on the current workspace
+    const workspace = global.workspace_manager.get_active_workspace();
+    const windows = workspace.list_windows();
+
+    // sort by stacking order (bottom to top)
+    windows.sort((a, b) => {
+      const actorA = a.get_compositor_private();
+      const actorB = b.get_compositor_private();
+      if (!actorA || !actorB) return 0;
+      // lower z-index first
+      return (
+        global.window_group.get_child_index(actorA) -
+        global.window_group.get_child_index(actorB)
+      );
+    });
+
+    // clone each visible window
+    for (const win of windows) {
+      // skip minimized, hidden, or special windows
+      if (win.is_hidden() || win.minimized) continue;
+
+      const actor = win.get_compositor_private();
+      if (!actor || !actor.visible) continue;
+
+      try {
+        const clone = new Clutter.Clone({
+          source: actor,
+          reactive: false,
+        });
+        // store source reference for coordinate math
+        clone._sourceActor = actor;
+
+        // insert above background, below panel
+        const insertIndex = this._bgClone ? 1 : 0;
+        this._magnifierGroup.insert_child_at_index(
+          clone,
+          insertIndex + this._windowClones.length,
+        );
+
+        this._windowClones.push(clone);
+      } catch (e) {
+        console.log(`[Hati] Failed to clone window: ${win.get_title()}: ${e}`);
+      }
+    }
+  }
 
   _tick() {
     if (!this._containerActor || !this._highlightActor)
@@ -213,9 +488,6 @@ export default class HatiExtension extends Extension {
     }
 
     // detect button state from mask
-    // global.get_pointer returns [x, y, mask]
-    // mask & Clutter.ModifierType.BUTTON1_MASK (Left)
-    // mask & Clutter.ModifierType.BUTTON3_MASK (Right) usually (in my system BUTTON3 is middle - scroll - click)
     const [, , mask] = global.get_pointer();
     const leftPressed = (mask & Clutter.ModifierType.BUTTON1_MASK) !== 0;
     const rightPressed = (mask & Clutter.ModifierType.BUTTON3_MASK) !== 0;
@@ -242,10 +514,9 @@ export default class HatiExtension extends Extension {
 
     // animate progress
     if (this._clickState.active) {
-      const speed = 0.15; // approx 60fps -> 0.15 * 60 = 9.0/sec?? too fast. 0.15 per tick(16ms) -> ~6 frames to full - fast
+      const speed = 0.15;
 
       if (!this._clickState.closing) {
-        // pressing down: animate to 1.0
         if (this._clickState.progress < 1.0) {
           this._clickState.progress = Math.min(
             1.0,
@@ -254,7 +525,6 @@ export default class HatiExtension extends Extension {
           this._canvas.queue_repaint();
         }
       } else {
-        // released: animate back to 0.0
         if (this._clickState.progress > 0.0) {
           this._clickState.progress = Math.max(
             0.0,
@@ -262,7 +532,6 @@ export default class HatiExtension extends Extension {
           );
           this._canvas.queue_repaint();
         } else {
-          // finished closing
           this._clickState.active = false;
           this._clickState.button = null;
         }
@@ -300,6 +569,66 @@ export default class HatiExtension extends Extension {
 
     // Scale highlight actor
     this._highlightActor.set_scale(scaleX, scaleY);
+
+    // Update Magnifier Position & Zoom (only when active)
+    if (this._magnifierGroup && this._magnifierActive) {
+      const size = this._settings.get_int("size") || 100;
+      const zoom = this._settings.get_double("magnifier-zoom") || 2.0;
+
+      // FULL DESKTOP CLONING
+      // rebuild window clones periodically
+      if (
+        !this._lastWindowRebuild ||
+        Date.now() - this._lastWindowRebuild > 500 // every ~500ms to avoid perf hit
+      ) {
+        this._rebuildWindowClones();
+        this._lastWindowRebuild = Date.now();
+      }
+
+      const boxSize = size + 50;
+      this._magnifierGroup.set_size(boxSize, boxSize);
+
+      this._magnifierGroup.set_position(
+        this._currentX - boxSize / 2,
+        this._currentY - boxSize / 2,
+      );
+
+      // transform all layers
+      const allLayers = [
+        ...this._windowClones,
+        this._bgClone,
+        this._panelClone,
+      ].filter((x) => x);
+
+      allLayers.forEach((clone) => {
+        if (!clone) return;
+
+        let sourceX = 0;
+        let sourceY = 0;
+
+        // windows have positions, background and panel are at 0,0
+        if (clone._sourceActor) {
+          sourceX = clone._sourceActor.x;
+          sourceY = clone._sourceActor.y;
+        }
+
+        clone.set_scale(zoom, zoom);
+        clone.set_translation(
+          boxSize / 2 - (this._currentX - sourceX) * zoom,
+          boxSize / 2 - (this._currentY - sourceY) * zoom,
+          0,
+        );
+      });
+    }
+
+    // update ghost position
+    if (this._magnifierGhost) {
+      const ghostSize = 100;
+      this._magnifierGhost.set_position(
+        this._currentX - ghostSize / 2,
+        this._currentY - ghostSize / 2,
+      );
+    }
 
     return Clutter.TICK_CONTINUE;
   }

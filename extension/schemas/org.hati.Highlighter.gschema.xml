@@ -125,6 +125,32 @@
       <description>Color validation string (rgba)</description>
     </key>
 
+    <key name="magnifier-enabled" type="b">
+      <default>false</default>
+      <summary>Enable magnifier</summary>
+      <description>Master switch for the magnifier feature</description>
+    </key>
+    <key name="magnifier-zoom" type="d">
+      <default>2.0</default>
+      <summary>Magnifier zoom factor</summary>
+      <description>Zoom level (1.0 - 4.0)</description>
+    </key>
+    <key name="magnifier-key" type="s">
+      <choices>
+        <choice value='Shift_L'/>
+        <choice value='Shift_R'/>
+        <choice value='Control_L'/>
+        <choice value='Control_R'/>
+        <choice value='Alt_L'/>
+        <choice value='Alt_R'/>
+        <choice value='Super_L'/>
+        <choice value='Super_R'/>
+      </choices>
+      <default>'Shift_L'</default>
+      <summary>Magnifier activation key</summary>
+      <description>Key to hold to activate magnifier</description>
+    </key>
+
     <key name="click-animation-mode" type="s">
       <choices>
         <choice value='directional'/>

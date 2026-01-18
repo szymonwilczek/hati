@@ -352,6 +352,74 @@ impl HatiWindow {
 
         page.add(&border_group);
 
+        // --- Magnifier Group ---
+        let magnifier_group = adw::PreferencesGroup::builder()
+            .title("Magnifier")
+            .build();
+
+        // Enable Toggle
+        let magnifier_enable_row = adw::SwitchRow::builder()
+            .title("Enable Magnifier")
+            .subtitle("Hold key to magnify area under cursor")
+            .build();
+        settings.bind("magnifier-enabled", &magnifier_enable_row, "active").build();
+        magnifier_group.add(&magnifier_enable_row);
+
+        // Zoom Slider
+        let magnifier_zoom_row = adw::SpinRow::builder()
+            .title("Zoom Factor")
+            .subtitle("Magnification level (1.0 - 4.0)")
+            .adjustment(&gtk4::Adjustment::new(
+                settings.double("magnifier-zoom"),
+                1.0,
+                4.0,
+                0.1,
+                0.5,
+                0.0,
+            ))
+            .digits(1)
+            .build();
+        settings.bind("magnifier-zoom", &magnifier_zoom_row, "value").build();
+        // Bind sensitivity to enabled toggle
+        settings.bind("magnifier-enabled", &magnifier_zoom_row, "sensitive").build();
+        magnifier_group.add(&magnifier_zoom_row);
+
+        // Activation Key Combo
+        let keys = gtk4::StringList::new(&[
+            "Shift_L", "Shift_R", 
+            "Control_L", "Control_R", 
+            "Alt_L", "Alt_R", 
+            "Super_L", "Super_R"
+        ]);
+        
+        let magnifier_key_row = adw::ComboRow::builder()
+            .title("Activation Key")
+            .subtitle("Key to hold")
+            .model(&keys)
+            .build();
+            
+        let current_key = settings.string("magnifier-key");
+        // Update selection loop
+        for (i, key) in ["Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Super_L", "Super_R"].iter().enumerate() {
+            if *key == current_key {
+                magnifier_key_row.set_selected(i as u32);
+                break;
+            }
+        }
+        
+        magnifier_key_row.connect_selected_notify(clone!(@weak settings => move |row| {
+            let keys = ["Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Super_L", "Super_R"];
+            let idx = row.selected() as usize;
+            if idx < keys.len() {
+                settings.set_string("magnifier-key", keys[idx]).unwrap();
+            }
+        }));
+        
+        settings.bind("magnifier-enabled", &magnifier_key_row, "sensitive").build();
+        magnifier_group.add(&magnifier_key_row);
+
+        page.add(&magnifier_group);
+
         let physics_group = adw::PreferencesGroup::builder()
             .title("Physics")
             .build();
