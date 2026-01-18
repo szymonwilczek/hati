@@ -251,6 +251,7 @@ export default class HatiExtension extends Extension {
     const borderWeight = this._settings.get_int("border-weight");
     const opacity = this._settings.get_double("opacity");
     const cornerRadius = this._settings.get_int("corner-radius");
+    const rotation = this._settings.get_int("rotation");
 
     // Shape
     const maxRadius = size / 2;
@@ -264,6 +265,7 @@ export default class HatiExtension extends Extension {
       color: color,
       radiusPx: radiusPx,
       opacity: opacity,
+      rotation: rotation,
     };
 
     // Canvas sizing and invalidation
@@ -292,15 +294,20 @@ export default class HatiExtension extends Extension {
 
     if (!this._drawSettings) return;
 
-    const { size, borderWeight, color, radiusPx } = this._drawSettings;
+    const { size, borderWeight, color, radiusPx, rotation } = this._drawSettings;
 
     const centerX = width / 2;
     const centerY = height / 2;
+    const rotationRad = (rotation || 0) * (Math.PI / 180);
 
-    // Helper function to draw rounded rectangle path
+    // Apply Transformations (Rotate around center)
+    cr.translate(centerX, centerY);
+    cr.rotate(rotationRad);
+
+    // Helper function to draw rounded rectangle path (centered at 0,0)
     const drawRoundedRect = (halfW, cornerR) => {
-      const x = centerX - halfW;
-      const y = centerY - halfW;
+      const x = -halfW;
+      const y = -halfW;
       const w = halfW * 2;
       const h = halfW * 2;
       const r = Math.max(0, cornerR);
@@ -323,7 +330,7 @@ export default class HatiExtension extends Extension {
     // 1px gap for visual separation
     const outerBorderWidth = borderWeight;
     const innerBorderWidth = borderWeight + 1;
-    const gap = 0.1; // Minimal gap
+    const gap = 1;
 
     const outerHalf = size / 2;
     // Inner ring starts where outer ring ends plus gap

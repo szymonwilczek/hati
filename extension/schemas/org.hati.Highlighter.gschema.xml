@@ -45,6 +45,13 @@
       <summary>Highlight shape</summary>
       <description>Shape of the cursor highlight</description>
     </key>
+
+    <key name="rotation" type="i">
+      <range min="0" max="360"/>
+      <default>0</default>
+      <summary>Rotation angle</summary>
+      <description>Angle of rotation in degrees (0-360)</description>
+    </key>
     
     <key name="glow" type="b">
       <default>true</default>

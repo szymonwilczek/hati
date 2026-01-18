@@ -97,6 +97,22 @@ impl HatiWindow {
         settings.bind("corner-radius", &corner_radius_row, "value").build();
         general_group.add(&corner_radius_row);
 
+        // rotation slider
+        let rotation_row = adw::SpinRow::builder()
+            .title("Rotation")
+            .subtitle("Rotation angle (degrees)")
+            .adjustment(&gtk4::Adjustment::new(
+                settings.int("rotation") as f64,
+                0.0,
+                360.0,
+                5.0,
+                15.0,
+                0.0,
+            ))
+            .build();
+        settings.bind("rotation", &rotation_row, "value").build();
+        general_group.add(&rotation_row);
+
         page.add(&general_group);
 
         let appearance_group = adw::PreferencesGroup::builder()
