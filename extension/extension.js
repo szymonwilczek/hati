@@ -14,10 +14,9 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 export default class HatiExtension extends Extension {
   constructor(metadata) {
     super(metadata);
-    this._highlightActor = null;
-    this._glowActor = null;
-    this._shaderEffect = null;
-    this._updateId = null;
+    this._containerActor = null;
+    this._outerRing = null;
+    this._innerRing = null;
     this._settings = null;
     this._settingsChangedId = null;
   }
@@ -66,49 +65,38 @@ export default class HatiExtension extends Extension {
   }
 
   _createHighlightActor() {
-    if (this._highlightActor) {
+    if (this._outerRing) {
       return; // already created!
     }
 
-    // get settings
-    const size = this._settings.get_int("size");
-    const color = this._parseColor(this._settings.get_string("color"));
-    const opacity = this._settings.get_double("opacity");
-    const borderWeight = this._settings.get_int("border-weight");
-    const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
-    const shape = this._getShapeValue(this._settings.get_string("shape"));
-    // CONTAINER STRATEGY:
-    // To prevent "trail/smear" artifacts on Wayland, we must ensure the actor's paint volume
-    // fully encloses the CSS box-shadow.
-    // We create a larger transparent container and place the styled actor inside it.
-
-    // 1. Container Actor (The one we move)
-    this._containerActor = new St.Bin({
+    // ST.DRAWINGAREA with correct Cairo GJS API
+    // Container handles physics positioning
+    this._containerActor = new St.Widget({
       style_class: "hati-container",
       reactive: false,
       can_focus: false,
-      x_align: Clutter.ActorAlign.CENTER,
-      y_align: Clutter.ActorAlign.CENTER,
+      layout_manager: new Clutter.BinLayout(),
     });
 
-    // 2. Glow Actor (Opaque Border + Outer Glow)
-    this._glowActor = new St.Bin({
-      style_class: "hati-glow",
+    // Drawing area for Cairo
+    this._canvas = new St.DrawingArea({
+      style_class: "hati-canvas",
       reactive: false,
       can_focus: false,
       x_align: Clutter.ActorAlign.CENTER,
       y_align: Clutter.ActorAlign.CENTER,
     });
 
-    // 3. Inner Highlight Actor (Semi-transparent Border)
-    this._highlightActor = new St.Bin({
-      style_class: "hati-highlight",
-      reactive: false,
-      can_focus: false,
+    this._canvas.connect('repaint', (area) => {
+      this._drawHighlight(area);
     });
 
-    this._glowActor.set_child(this._highlightActor);
-    this._containerActor.set_child(this._glowActor);
+    this._containerActor.add_child(this._canvas);
+
+    // Keep for compatibility
+    this._highlightActor = this._canvas;
+    this._outerRing = this._canvas;
+    this._innerRing = null;
 
     // State for Physics
     this._currentX = 0;
@@ -117,27 +105,24 @@ export default class HatiExtension extends Extension {
     this._velocityY = 0;
     this._tickId = 0;
 
-    // Physics Constants (Initialized from Settings)
+    // Physics Constants
     this._k = 0.12;
     this._d = 0.65;
-    this._updatePhysicsConstants(); // Load actual values
-
-    this._squishDist = 0; // Will be calculated based on size
+    this._updatePhysicsConstants();
 
     // Initial Style
     this._refreshStyle();
 
-    // Add Container to UI Group
+    // Add to UI
     Main.uiGroup.add_child(this._containerActor);
 
-    // Start Physics Loop using GLib Timeout (Fallback for Clutter tick issues)
-    // Runs at ~60 FPS (16ms)
+    // Start Physics
     this._tickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
       this._tick();
       return GLib.SOURCE_CONTINUE;
     });
 
-    console.log("[Hati] Highlight actor created (Container + CSS + Physics Mode)");
+    console.log("[Hati] Highlight actor created (CSS Mode - Reverted)");
   }
 
   _updatePhysicsConstants() {
@@ -145,17 +130,11 @@ export default class HatiExtension extends Extension {
     this._k = this._settings.get_double("inertia-stiffness");
     this._d = this._settings.get_double("inertia-smoothness");
     this._inertiaEnabled = this._settings.get_boolean("inertia-enabled");
-    // Safety Clamp
     this._d = Math.max(0.01, Math.min(0.99, this._d));
   }
 
   _removeHighlightActor() {
     if (this._containerActor) {
-      if (this._trackingId) {
-        this._containerActor.remove_effect(this._trackingId);
-        this._trackingId = null;
-      }
-
       if (this._tickId) {
         GLib.source_remove(this._tickId);
         this._tickId = 0;
@@ -164,94 +143,59 @@ export default class HatiExtension extends Extension {
       Main.uiGroup.remove_child(this._containerActor);
       this._containerActor.destroy();
       this._containerActor = null;
-      this._glowActor = null; // Cleanup
-      this._highlightActor = null;
+      this._outerRing = null;
+      this._innerRing = null;
     }
   }
 
-  _startCursorTracking() {
-    // Deprecated: Physics loop starts on creation
-  }
-
-  _stopCursorTracking() {
-    // Deprecated: Physics loop stops on destruction
-  }
+  _startCursorTracking() { }
+  _stopCursorTracking() { }
 
   _tick() {
     if (!this._containerActor || !this._highlightActor) return Clutter.TICK_STOP;
 
     const [pointerX, pointerY] = global.get_pointer();
-
-    // 1. Spring Physics Algorithm (Frame-independent-ish approximation)
-    // F = -k*x - d*v
-
-    // Target is where the mouse IS
-    // Current is where the actor IS
-    // In our system, we want the CENTER of the actor to be at the mouse.
-
     const containerWidth = this._containerActor.get_width();
     const containerHeight = this._containerActor.get_height();
 
-    // Dist from Mouse to Center of Actor
-    // We track total position of Top-Left corner for set_position
-    // But physics operates on "Center Point".
-
-    // Let's track the CENTER position in physics vars
-    // Initialize if zero (first run)
     if (this._currentX === 0 && this._currentY === 0) {
       this._currentX = pointerX;
       this._currentY = pointerY;
     }
 
-    // Physics Update
     if (this._inertiaEnabled) {
       const dx = pointerX - this._currentX;
       const dy = pointerY - this._currentY;
-
       const ax = dx * this._k;
       const ay = dy * this._k;
-
       this._velocityX = (this._velocityX + ax) * this._d;
       this._velocityY = (this._velocityY + ay) * this._d;
-
       this._currentX += this._velocityX;
       this._currentY += this._velocityY;
     } else {
-      // Direct follow
       this._currentX = pointerX;
       this._currentY = pointerY;
       this._velocityX = 0;
       this._velocityY = 0;
     }
 
-    // Apply Position (Top-Left)
     this._containerActor.set_position(
       this._currentX - containerWidth / 2,
       this._currentY - containerHeight / 2
     );
 
-    // 2. Squash & Stretch based on Velocity (Optional)
-    // Stretch in direction of movement
-    const velocity = Math.sqrt(this._velocityX ** 2 + this._velocityY ** 2);
-    // Scale factor: 1.0 + (velocity * 0.01)
-    // Needs rotation to match velocity vector? Complex for CSS box.
-    // Let's stick to Edge Squish first.
-
-    // 3. Edge Squish
-    // If center is close to screen edge, squash the INNER actor.
+    // Edge Squish
     const monitor = Main.layoutManager.primaryMonitor;
     if (!monitor) return Clutter.TICK_CONTINUE;
 
-    // Distance to edges
     const distLeft = this._currentX - monitor.x;
     const distRight = (monitor.x + monitor.width) - this._currentX;
     const distTop = this._currentY - monitor.y;
     const distBottom = (monitor.y + monitor.height) - this._currentY;
 
-    // Radius of visual part
     const size = this._settings.get_int("size");
     const radius = size / 2;
-    const limit = radius + 20; // Start squishing slightly before touch
+    const limit = radius + 20;
 
     let scaleX = 1.0;
     let scaleY = 1.0;
@@ -261,17 +205,15 @@ export default class HatiExtension extends Extension {
     if (distTop < limit) scaleY = Math.max(0.4, distTop / limit);
     if (distBottom < limit) scaleY = Math.max(0.4, distBottom / limit);
 
-    // Gentle recovery curve
     scaleX = Math.pow(scaleX, 0.5);
     scaleY = Math.pow(scaleY, 0.5);
 
-    // Apply scaling to GLOW actor (Parent of Highlight)
-    this._glowActor.set_scale(scaleX, scaleY);
+    // Scale highlight actor
+    this._highlightActor.set_scale(scaleX, scaleY);
 
     return Clutter.TICK_CONTINUE;
   }
 
-  // Clean up unused function
   _updateHighlightPosition() { }
 
   _toggleHighlight() {
@@ -297,163 +239,105 @@ export default class HatiExtension extends Extension {
       return;
     }
 
-    // Explicitly handle all visual keys to be safe
-    // Fallthrough would work but this is clearer
-    if (
-      key === "size" ||
-      key === "color" ||
-      key === "opacity" ||
-      key === "border-weight" ||
-      key === "shape" ||
-      key === "glow" ||
-      key === "corner-radius" ||
-      key === "glow-radius" ||
-      key === "glow-spread"
-    ) {
-      this._refreshStyle();
-      return;
-    }
-
-    this._refreshStyle(); // Catch-all
+    this._refreshStyle();
   }
 
   _refreshStyle() {
-    if (!this._highlightActor || !this._containerActor || !this._glowActor) return;
+    if (!this._highlightActor || !this._containerActor) return;
 
-    // Fetch Settings
     const size = this._settings.get_int("size");
     const colorStr = this._settings.get_string("color");
     const color = this._parseColor(colorStr);
     const borderWeight = this._settings.get_int("border-weight");
     const opacity = this._settings.get_double("opacity");
-    const glow = this._settings.get_boolean("glow");
     const cornerRadius = this._settings.get_int("corner-radius");
-    const glowRadius = this._settings.get_int("glow-radius");
-    const glowSpread = this._settings.get_int("glow-spread");
 
-    // Logic: Shape (Corner Radius driven)
+    // Shape
     const maxRadius = size / 2;
     const radiusPx = Math.round(maxRadius * (cornerRadius / 50.0));
-    let radius = `${radiusPx}px`;
+    const radius = `${radiusPx}px`;
 
-    // Calculate Colors
-    // Outer Ring: OPAQUE (alpha 1.0)
-    // Inner Ring: SEMI-TRANSPARENT (user's alpha)
+    // Store settings for draw callback
+    this._drawSettings = {
+      size: size,
+      borderWeight: borderWeight,
+      color: color,
+      radiusPx: radiusPx,
+      opacity: opacity,
+    };
 
-    // Actually, user's color might have alpha. 
-    // The requirement: "Outer is completely opaque", "Inner is semi-transparent"
-    // Let's force Outer Alpha to 1.0 (or at least high)
-    // And Inner Alpha to setting value (default 0.7)
-
-    const opaqueColor = `rgba(${color.red}, ${color.green}, ${color.blue}, 1.0)`;
-    const innerColor = `rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha})`;
-
-    // Logic: Glow (on Outer Opaque Ring)
-    let shadow = "none";
-    let padding = 0;
-
-    if (glow) {
-      shadow = `0 0 ${glowRadius}px ${glowSpread}px ${opaqueColor}`; // Use opaque color for glow? Or inner color? Usually Glow matches source.
-      padding = glowSpread + glowRadius + 10;
-    } else {
-      padding = 10;
-    }
-
-    // 1. Style Glow Actor (Outer Opaque Ring + Glow)
-    // We want a THIN opaque border (e.g. 2px or 1px)
-    const outerBorderWidth = 2;
-    const innerBorderWidth = Math.max(0, borderWeight - outerBorderWidth);
-
-    this._glowActor.set_size(size, size);
-    this._glowActor.set_pivot_point(0.5, 0.5);
-    this._glowActor.set_style(`
-       background-color: transparent;
-       border: ${outerBorderWidth}px solid ${opaqueColor};
-       border-radius: ${radius};
-       box-shadow: ${shadow};
-    `);
-
-    // 2. Style Highlight Actor (Inner Semi-Transparent Ring)
-    // It should fill the parent?
-    // If we set size, we need to account for parent's border?
-    // St.Bin with Clutter.Align.FILL should handle it if specific size not set?
-    // To match the curvature perfectly:
-    // Inner Radius = Outer Radius - Distance (Border Width)
-    const innerRadiusPx = Math.max(0, radiusPx - outerBorderWidth);
-    const innerRadius = `${innerRadiusPx}px`;
-
-    // Inner Size = Outer Size - (2 * Border Width)
-    const innerSize = Math.max(0, size - (outerBorderWidth * 2));
-
-    this._highlightActor.set_size(innerSize, innerSize);
-
-    // Reset margins just in case
-    this._highlightActor.set_margin_top(0);
-    this._highlightActor.set_margin_bottom(0);
-    this._highlightActor.set_margin_left(0);
-    this._highlightActor.set_margin_right(0);
-
-    this._highlightActor.set_style(`
-        background-color: transparent;
-        border: ${innerBorderWidth}px solid ${innerColor};
-        border-radius: ${innerRadius}; 
-    `);
-
-
-
-    // 3. Size the Container
+    // Canvas sizing and invalidation
+    const padding = 20;
     const totalSize = size + (padding * 2);
-    this._containerActor.set_size(totalSize, totalSize);
 
-    // 4. Opacity
+    this._containerActor.set_size(totalSize, totalSize);
+    this._canvas.set_size(totalSize, totalSize);
+    this._canvas.queue_repaint();
+
+    // Opacity on container
     this._containerActor.set_opacity(Math.floor(opacity * 255));
   }
 
-  _updateActorOpacity() {
-    // Managed by refreshStyle
-  }
+  // Cairo drawing callback for St.DrawingArea
+  _drawHighlight(area) {
+    const cr = area.get_context();
+    const [width, height] = area.get_surface_size();
 
-  _updateActorSize() {
-    // Managed by refreshStyle
-  }
+    // Clear canvas
+    cr.save();
+    cr.setOperator(0); // CLEAR
+    cr.paint();
+    cr.restore();
 
-  _updateShaderBorderWeight() {
-    if (!this._shaderEffect) return;
+    if (!this._drawSettings) return;
 
-    const borderWeight = this._settings.get_int("border-weight");
-    this._shaderEffect.set_uniform_value("u_border_weight", borderWeight);
-  }
+    const { size, borderWeight, color, radiusPx } = this._drawSettings;
 
-  _updateShaderGlow() {
-    if (!this._shaderEffect) return;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const halfSize = size / 2;
 
-    const glow = this._settings.get_boolean("glow") ? 1.0 : 0.0;
-    this._shaderEffect.set_uniform_value("u_glow", glow);
-  }
+    // Set color (Cairo uses 0-1 range)
+    cr.setSourceRGBA(
+      color.red / 255,
+      color.green / 255,
+      color.blue / 255,
+      color.alpha
+    );
 
-  _updateShaderShape() {
-    if (!this._shaderEffect) return;
+    cr.setLineWidth(borderWeight);
 
-    const shape = this._getShapeValue(this._settings.get_string("shape"));
-    this._shaderEffect.set_uniform_value("u_shape", shape);
+    // Draw rounded rectangle path
+    const radius = radiusPx;
+    const x = centerX - halfSize;
+    const y = centerY - halfSize;
+    const w = size;
+    const h = size;
+
+    // Rounded rectangle using arcs
+    cr.newPath();
+    cr.arc(x + w - radius, y + radius, radius, -Math.PI / 2, 0);
+    cr.arc(x + w - radius, y + h - radius, radius, 0, Math.PI / 2);
+    cr.arc(x + radius, y + h - radius, radius, Math.PI / 2, Math.PI);
+    cr.arc(x + radius, y + radius, radius, Math.PI, 3 * Math.PI / 2);
+    cr.closePath();
+
+    cr.stroke();
+
+    // Dispose context when done
+    cr.$dispose();
   }
 
   _getShapeValue(shapeString) {
-    // convert shape name to numeric value for shader
     switch (shapeString) {
-      case "circle":
-        return 0.0;
-      case "squircle":
-        return 1.0;
-      case "square":
-        return 2.0;
-      default:
-        return 0.0; // default to circle
+      case "circle": return 0.0;
+      case "squircle": return 1.0;
+      case "square": return 2.0;
+      default: return 0.0;
     }
   }
 
   _parseColor(colorString) {
-    // parse "rgba(r, g, b, a)" format
     const match = colorString.match(
       /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/,
     );
@@ -467,7 +351,6 @@ export default class HatiExtension extends Extension {
       };
     }
 
-    // Default blue
     return { red: 99, green: 162, blue: 255, alpha: 0.7 };
   }
 }
