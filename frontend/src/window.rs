@@ -70,15 +70,32 @@ impl HatiWindow {
         });
 
         shape_row.connect_selected_notify(clone!(@weak settings => move |row| {
-            let shape = match row.selected() {
-                0 => "circle",
-                1 => "squircle",
-                2 => "square",
-                _ => "circle",
+            let (shape, radius) = match row.selected() {
+                0 => ("circle", 50),
+                1 => ("squircle", 25),
+                2 => ("square", 0),
+                _ => ("circle", 50),
             };
             settings.set_string("shape", shape).unwrap();
+            settings.set_int("corner-radius", radius).unwrap();
         }));
         general_group.add(&shape_row);
+        
+        // corner radius slider
+        let corner_radius_row = adw::SpinRow::builder()
+            .title("Corner Radius (%)")
+            .subtitle("Deformation level (0=Square, 50=Circle)")
+            .adjustment(&gtk4::Adjustment::new(
+                settings.int("corner-radius") as f64,
+                0.0,
+                50.0,
+                1.0,
+                5.0,
+                0.0,
+            ))
+            .build();
+        settings.bind("corner-radius", &corner_radius_row, "value").build();
+        general_group.add(&corner_radius_row);
 
         page.add(&general_group);
 
@@ -173,6 +190,40 @@ impl HatiWindow {
         glow_row.set_active(settings.boolean("glow"));
         settings.bind("glow", &glow_row, "active").build();
         border_group.add(&glow_row);
+
+        // Glow Radius
+        let glow_radius_row = adw::SpinRow::builder()
+            .title("Glow Radius")
+            .subtitle("Blur amount")
+            .adjustment(&gtk4::Adjustment::new(
+                settings.int("glow-radius") as f64,
+                0.0,
+                100.0,
+                1.0,
+                5.0,
+                0.0,
+            ))
+            .build();
+        settings.bind("glow-radius", &glow_radius_row, "value").build();
+        settings.bind("glow", &glow_radius_row, "sensitive").build();
+        border_group.add(&glow_radius_row);
+
+        // Glow Spread
+        let glow_spread_row = adw::SpinRow::builder()
+            .title("Glow Spread")
+            .subtitle("Spread amount")
+            .adjustment(&gtk4::Adjustment::new(
+                settings.int("glow-spread") as f64,
+                0.0,
+                50.0,
+                1.0,
+                5.0,
+                0.0,
+            ))
+            .build();
+        settings.bind("glow-spread", &glow_spread_row, "value").build();
+        settings.bind("glow", &glow_spread_row, "sensitive").build();
+        border_group.add(&glow_spread_row);
 
         page.add(&border_group);
 

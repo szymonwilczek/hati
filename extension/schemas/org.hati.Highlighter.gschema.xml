@@ -51,6 +51,27 @@
       <summary>Enable glow effect</summary>
       <description>Add a soft glow around the highlight ring</description>
     </key>
+
+    <key name="corner-radius" type="i">
+      <range min="0" max="50"/>
+      <default>50</default>
+      <summary>Corner Radius Percentage</summary>
+      <description>0=Square, 25=Squircle, 50=Circle</description>
+    </key>
+
+    <key name="glow-radius" type="i">
+      <range min="0" max="100"/>
+      <default>20</default>
+      <summary>Glow Blur Radius</summary>
+      <description>Blur radius of the glow in pixels</description>
+    </key>
+
+    <key name="glow-spread" type="i">
+      <range min="0" max="50"/>
+      <default>5</default>
+      <summary>Glow Spread Radius</summary>
+      <description>Spread radius of the glow in pixels</description>
+    </key>
     
     <key name="click-animations" type="b">
       <default>true</default>
