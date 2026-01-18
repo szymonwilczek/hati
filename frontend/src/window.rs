@@ -180,6 +180,15 @@ impl HatiWindow {
             .title("Physics")
             .build();
 
+        // Inertia Toggle
+        let inertia_row = adw::SwitchRow::builder()
+            .title("Enable Physics")
+            .subtitle("Use inertia and spring dynamics")
+            .build();
+        inertia_row.set_active(settings.boolean("inertia-enabled"));
+        settings.bind("inertia-enabled", &inertia_row, "active").build();
+        physics_group.add(&inertia_row);
+
         // Stiffness
         let stiffness_row = adw::SpinRow::builder()
             .title("Stiffness (Speed)")
@@ -195,6 +204,7 @@ impl HatiWindow {
             .digits(2)
             .build();
         settings.bind("inertia-stiffness", &stiffness_row, "value").build();
+        settings.bind("inertia-enabled", &stiffness_row, "sensitive").build();
         physics_group.add(&stiffness_row);
 
         // Smoothness
@@ -212,6 +222,7 @@ impl HatiWindow {
             .digits(2)
             .build();
         settings.bind("inertia-smoothness", &smoothness_row, "value").build();
+        settings.bind("inertia-enabled", &smoothness_row, "sensitive").build();
         physics_group.add(&smoothness_row);
 
         page.add(&physics_group);

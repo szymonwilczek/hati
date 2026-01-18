@@ -133,9 +133,9 @@ export default class HatiExtension extends Extension {
     if (!this._settings) return;
     this._k = this._settings.get_double("inertia-stiffness");
     this._d = this._settings.get_double("inertia-smoothness");
+    this._inertiaEnabled = this._settings.get_boolean("inertia-enabled");
     // Safety Clamp
     this._d = Math.max(0.01, Math.min(0.99, this._d));
-    // console.log(`[Hati] Physics Updated: k=${this._k}, d=${this._d}`);
   }
 
   _removeHighlightActor() {
@@ -191,17 +191,26 @@ export default class HatiExtension extends Extension {
       this._currentY = pointerY;
     }
 
-    const dx = pointerX - this._currentX;
-    const dy = pointerY - this._currentY;
+    // Physics Update
+    if (this._inertiaEnabled) {
+      const dx = pointerX - this._currentX;
+      const dy = pointerY - this._currentY;
 
-    const ax = dx * this._k;
-    const ay = dy * this._k;
+      const ax = dx * this._k;
+      const ay = dy * this._k;
 
-    this._velocityX = (this._velocityX + ax) * this._d;
-    this._velocityY = (this._velocityY + ay) * this._d;
+      this._velocityX = (this._velocityX + ax) * this._d;
+      this._velocityY = (this._velocityY + ay) * this._d;
 
-    this._currentX += this._velocityX;
-    this._currentY += this._velocityY;
+      this._currentX += this._velocityX;
+      this._currentY += this._velocityY;
+    } else {
+      // Direct follow
+      this._currentX = pointerX;
+      this._currentY = pointerY;
+      this._velocityX = 0;
+      this._velocityY = 0;
+    }
 
     // Apply Position (Top-Left)
     this._containerActor.set_position(
@@ -267,7 +276,11 @@ export default class HatiExtension extends Extension {
       return;
     }
 
-    if (key === "inertia-stiffness" || key === "inertia-smoothness") {
+    if (
+      key === "inertia-stiffness" ||
+      key === "inertia-smoothness" ||
+      key === "inertia-enabled"
+    ) {
       this._updatePhysicsConstants();
       return;
     }
