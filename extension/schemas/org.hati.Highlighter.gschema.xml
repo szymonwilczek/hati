@@ -35,6 +35,13 @@
       <description>Thickness of the highlight ring border in pixels</description>
     </key>
     
+    <key name="gap" type="d">
+      <range min="0.0" max="20.0"/>
+      <default>1.0</default>
+      <summary>Gap between rings</summary>
+      <description>Distance between outer and inner ring in pixels</description>
+    </key>
+    
     <key name="shape" type="s">
       <choices>
         <choice value='circle'/>

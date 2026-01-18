@@ -249,6 +249,7 @@ export default class HatiExtension extends Extension {
     const colorStr = this._settings.get_string("color");
     const color = this._parseColor(colorStr);
     const borderWeight = this._settings.get_int("border-weight");
+    const gap = this._settings.get_double("gap");
     const opacity = this._settings.get_double("opacity");
     const cornerRadius = this._settings.get_int("corner-radius");
     const rotation = this._settings.get_int("rotation");
@@ -262,6 +263,7 @@ export default class HatiExtension extends Extension {
     this._drawSettings = {
       size: size,
       borderWeight: borderWeight,
+      gap: gap,
       color: color,
       radiusPx: radiusPx,
       opacity: opacity,
@@ -292,9 +294,7 @@ export default class HatiExtension extends Extension {
     cr.paint();
     cr.restore();
 
-    if (!this._drawSettings) return;
-
-    const { size, borderWeight, color, radiusPx, rotation } = this._drawSettings;
+    const { size, borderWeight, color, radiusPx, rotation, gap } = this._drawSettings;
 
     const centerX = width / 2;
     const centerY = height / 2;
@@ -327,10 +327,10 @@ export default class HatiExtension extends Extension {
     // Calculate ring dimensions
     // Outer: borderWeight px, 100% opaque
     // Inner: borderWeight + 1 px, user's opacity
-    // 1px gap for visual separation
+    // Gap: User defined
     const outerBorderWidth = borderWeight;
     const innerBorderWidth = borderWeight + 1;
-    const gap = 1;
+    // const gap is destructured above
 
     const outerHalf = size / 2;
     // Inner ring starts where outer ring ends plus gap

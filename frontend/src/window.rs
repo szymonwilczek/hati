@@ -198,6 +198,23 @@ impl HatiWindow {
         settings.bind("border-weight", &border_weight_row, "value").build();
         border_group.add(&border_weight_row);
 
+        // gap slider
+        let gap_row = adw::SpinRow::builder()
+            .title("Ring Gap")
+            .subtitle("Space between rings")
+            .adjustment(&gtk4::Adjustment::new(
+                settings.double("gap"),
+                0.0,
+                20.0,
+                0.5,
+                1.0,
+                0.0,
+            ))
+            .digits(1)
+            .build();
+        settings.bind("gap", &gap_row, "value").build();
+        border_group.add(&gap_row);
+
         // glow toggle
         let glow_row = adw::SwitchRow::builder()
             .title("Glow Effect")
