@@ -50,9 +50,7 @@ impl HatiWindow {
             .subtitle("Show cursor highlight")
             .build();
         enable_row.set_active(settings.boolean("enabled"));
-        enable_row.connect_active_notify(clone!(@weak settings => move |row| {
-            settings.set_boolean("enabled", row.is_active()).unwrap();
-        }));
+        settings.bind("enabled", &enable_row, "active").build();
         general_group.add(&enable_row);
 
         // shape selector
@@ -125,9 +123,7 @@ impl HatiWindow {
                 0.0,
             ))
             .build();
-        size_row.connect_changed(clone!(@weak settings => move |row| {
-            settings.set_int("size", row.value() as i32).unwrap();
-        }));
+        settings.bind("size", &size_row, "value").build();
         appearance_group.add(&size_row);
 
         // opacity slider
@@ -144,9 +140,7 @@ impl HatiWindow {
             ))
             .digits(2)
             .build();
-        opacity_row.connect_changed(clone!(@weak settings => move |row| {
-            settings.set_double("opacity", row.value()).unwrap();
-        }));
+        settings.bind("opacity", &opacity_row, "value").build();
         appearance_group.add(&opacity_row);
 
         page.add(&appearance_group);
@@ -168,9 +162,7 @@ impl HatiWindow {
                 0.0,
             ))
             .build();
-        border_weight_row.connect_changed(clone!(@weak settings => move |row| {
-            settings.set_int("border-weight", row.value() as i32).unwrap();
-        }));
+        settings.bind("border-weight", &border_weight_row, "value").build();
         border_group.add(&border_weight_row);
 
         // glow toggle
@@ -179,9 +171,7 @@ impl HatiWindow {
             .subtitle("Add soft outer glow")
             .build();
         glow_row.set_active(settings.boolean("glow"));
-        glow_row.connect_active_notify(clone!(@weak settings => move |row| {
-            settings.set_boolean("glow", row.is_active()).unwrap();
-        }));
+        settings.bind("glow", &glow_row, "active").build();
         border_group.add(&glow_row);
 
         page.add(&border_group);
@@ -204,9 +194,7 @@ impl HatiWindow {
             ))
             .digits(2)
             .build();
-        stiffness_row.connect_changed(clone!(@weak settings => move |row| {
-             settings.set_double("inertia-stiffness", row.value()).unwrap();
-        }));
+        settings.bind("inertia-stiffness", &stiffness_row, "value").build();
         physics_group.add(&stiffness_row);
 
         // Smoothness
@@ -223,9 +211,7 @@ impl HatiWindow {
             ))
             .digits(2)
             .build();
-         smoothness_row.connect_changed(clone!(@weak settings => move |row| {
-             settings.set_double("inertia-smoothness", row.value()).unwrap();
-        }));
+        settings.bind("inertia-smoothness", &smoothness_row, "value").build();
         physics_group.add(&smoothness_row);
 
         page.add(&physics_group);
@@ -240,9 +226,7 @@ impl HatiWindow {
             .subtitle("Show ripple effect when clicking")
             .build();
         click_animations_row.set_active(settings.boolean("click-animations"));
-        click_animations_row.connect_active_notify(clone!(@weak settings => move |row| {
-            settings.set_boolean("click-animations", row.is_active()).unwrap();
-        }));
+        settings.bind("click-animations", &click_animations_row, "active").build();
         behavior_group.add(&click_animations_row);
 
         // auto-hide toggle
@@ -251,9 +235,7 @@ impl HatiWindow {
             .subtitle("Hide when cursor is stationary")
             .build();
         auto_hide_row.set_active(settings.boolean("auto-hide"));
-        auto_hide_row.connect_active_notify(clone!(@weak settings => move |row| {
-            settings.set_boolean("auto-hide", row.is_active()).unwrap();
-        }));
+        settings.bind("auto-hide", &auto_hide_row, "active").build();
         behavior_group.add(&auto_hide_row);
 
         page.add(&behavior_group);
