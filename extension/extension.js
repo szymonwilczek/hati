@@ -18,78 +18,8 @@ import { parseColor } from "./utils.js";
 import { Physics } from "./modules/physics.js";
 import { Glow } from "./modules/glow.js";
 import { getAnimation } from "./animations/animations.js";
-
-// GLSL Shader for rounded corners clipping
-// See: shaders/magnifier-clip.glsl and shaders/magnifier-clip.frag
-let SHADER_DECLARATIONS = "";
-let SHADER_CODE = "";
-
-function loadShaderFiles(extensionPath) {
-  try {
-    const declFile = Gio.File.new_for_path(
-      `${extensionPath}/shaders/magnifier-clip.glsl`,
-    );
-    const codeFile = Gio.File.new_for_path(
-      `${extensionPath}/shaders/magnifier-clip.frag`,
-    );
-
-    const [declSuccess, declContents] = declFile.load_contents(null);
-    const [codeSuccess, codeContents] = codeFile.load_contents(null);
-
-    if (declSuccess) {
-      SHADER_DECLARATIONS = new TextDecoder().decode(declContents);
-    } else {
-      console.error("[Hati] Failed to load magnifier-clip.glsl");
-    }
-
-    if (codeSuccess) {
-      SHADER_CODE = new TextDecoder().decode(codeContents);
-    } else {
-      console.error("[Hati] Failed to load magnifier-clip.frag");
-    }
-
-    console.log("[Hati] Shaders loaded from files");
-  } catch (e) {
-    console.error(`[Hati] Error loading shaders: ${e}`);
-  }
-}
-
-// for rounded corners clipping
-const MagnifierClipEffect = GObject.registerClass(
-  {},
-  class MagnifierClipEffect extends Shell.GLSLEffect {
-    _init() {
-      super._init();
-      this._boundsLoc = this.get_uniform_location("bounds");
-      this._clipRadiusLoc = this.get_uniform_location("clipRadius");
-      this._pixelStepLoc = this.get_uniform_location("pixelStep");
-      console.log("[Hati] MagnifierClipEffect initialized");
-    }
-
-    vfunc_build_pipeline() {
-      this.add_glsl_snippet(
-        Cogl.SnippetHook.FRAGMENT,
-        SHADER_DECLARATIONS,
-        SHADER_CODE,
-        false,
-      );
-    }
-
-    updateUniforms(width, height, cornerRadius) {
-      const pixelStep = [1.0 / width, 1.0 / height];
-      const bounds = [0, 0, width, height];
-
-      this.set_uniform_float(this._boundsLoc, 4, bounds);
-      this.set_uniform_float(this._clipRadiusLoc, 1, [cornerRadius]);
-      this.set_uniform_float(this._pixelStepLoc, 2, pixelStep);
-      this.queue_repaint();
-
-      console.log(
-        `[Hati ClipEffect] Updated: ${width}x${height}, radius=${cornerRadius}`,
-      );
-    }
-  },
-);
+import { initShaders } from "./shaders/shaders.js";
+import { MagnifierClipEffect } from "./shaders/magnifier-clip-effect.js";
 
 export default class HatiExtension extends Extension {
   constructor(metadata) {
@@ -104,8 +34,8 @@ export default class HatiExtension extends Extension {
   enable() {
     console.log("[Hati] Enabling cursor highlighter...");
 
-    // Load shaders from external files
-    loadShaderFiles(this.path);
+    // from external files
+    initShaders(this.path);
 
     this._settings = this.getSettings("org.hati.Highlighter");
     this._interfaceSettings = new Gio.Settings({
