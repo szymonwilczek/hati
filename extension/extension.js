@@ -15,6 +15,7 @@ import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 import { parseColor } from "./utils.js";
+import { Physics } from "./modules/physics.js";
 
 // GLSL Shader for rounded corners clipping
 const SHADER_DECLARATIONS = `
@@ -262,17 +263,9 @@ export default class HatiExtension extends Extension {
       },
     );
 
-    // State for Physics
-    this._currentX = 0;
-    this._currentY = 0;
-    this._velocityX = 0;
-    this._velocityY = 0;
+    // Physics
+    this._physics = new Physics(this._settings);
     this._tickId = 0;
-
-    // Physics Constants
-    this._k = 0.12;
-    this._d = 0.65;
-    this._updatePhysicsConstants();
 
     // Initial Style
     this._refreshStyle();
@@ -292,11 +285,9 @@ export default class HatiExtension extends Extension {
   }
 
   _updatePhysicsConstants() {
-    if (!this._settings) return;
-    this._k = this._settings.get_double("inertia-stiffness");
-    this._d = this._settings.get_double("inertia-smoothness");
-    this._inertiaEnabled = this._settings.get_boolean("inertia-enabled");
-    this._d = Math.max(0.01, Math.min(0.99, this._d));
+    if (this._physics) {
+      this._physics.updateConstants();
+    }
   }
 
   _removeHighlightActor() {
@@ -415,10 +406,7 @@ export default class HatiExtension extends Extension {
 
       // sync position immediately to prevent flicker/jump from old position
       const [pointerX, pointerY] = global.get_pointer();
-      this._currentX = pointerX;
-      this._currentY = pointerY;
-      this._velocityX = 0;
-      this._velocityY = 0;
+      this._physics.reset(pointerX, pointerY);
     }
 
     // create clones on-demand
@@ -655,26 +643,8 @@ export default class HatiExtension extends Extension {
       }
     }
 
-    if (this._currentX === 0 && this._currentY === 0) {
-      this._currentX = pointerX;
-      this._currentY = pointerY;
-    }
-
-    if (this._inertiaEnabled) {
-      const dx = pointerX - this._currentX;
-      const dy = pointerY - this._currentY;
-      const ax = dx * this._k;
-      const ay = dy * this._k;
-      this._velocityX = (this._velocityX + ax) * this._d;
-      this._velocityY = (this._velocityY + ay) * this._d;
-      this._currentX += this._velocityX;
-      this._currentY += this._velocityY;
-    } else {
-      this._currentX = pointerX;
-      this._currentY = pointerY;
-      this._velocityX = 0;
-      this._velocityY = 0;
-    }
+    // Physics Update
+    const [curX, curY] = this._physics.update(pointerX, pointerY);
 
     // --- Click Animation Logic ---
     if (!this._clickState) {
@@ -737,18 +707,18 @@ export default class HatiExtension extends Extension {
     }
 
     this._containerActor.set_position(
-      this._currentX - containerWidth / 2,
-      this._currentY - containerHeight / 2,
+      curX - containerWidth / 2,
+      curY - containerHeight / 2,
     );
 
     // Edge Squish
     const monitor = Main.layoutManager.primaryMonitor;
     if (!monitor) return Clutter.TICK_CONTINUE;
 
-    const distLeft = this._currentX - monitor.x;
-    const distRight = monitor.x + monitor.width - this._currentX;
-    const distTop = this._currentY - monitor.y;
-    const distBottom = monitor.y + monitor.height - this._currentY;
+    const distLeft = curX - monitor.x;
+    const distRight = monitor.x + monitor.width - curX;
+    const distTop = curY - monitor.y;
+    const distBottom = monitor.y + monitor.height - curY;
 
     const size = this._settings.get_int("size");
     const radius = size / 2;
@@ -841,8 +811,8 @@ export default class HatiExtension extends Extension {
       );
 
       this._magnifierGroup.set_position(
-        this._currentX - magnifierDiameter / 2,
-        this._currentY - magnifierDiameter / 2,
+        curX - magnifierDiameter / 2,
+        curY - magnifierDiameter / 2,
       );
 
       // transform all layers
@@ -866,8 +836,8 @@ export default class HatiExtension extends Extension {
 
         clone.set_scale(zoom, zoom);
         clone.set_translation(
-          magnifierDiameter / 2 - (this._currentX - sourceX) * zoom,
-          magnifierDiameter / 2 - (this._currentY - sourceY) * zoom,
+          magnifierDiameter / 2 - (curX - sourceX) * zoom,
+          magnifierDiameter / 2 - (curY - sourceY) * zoom,
           0,
         );
       });
@@ -877,8 +847,8 @@ export default class HatiExtension extends Extension {
     if (this._magnifierGhost) {
       const ghostSize = 100;
       this._magnifierGhost.set_position(
-        this._currentX - ghostSize / 2,
-        this._currentY - ghostSize / 2,
+        curX - ghostSize / 2,
+        curY - ghostSize / 2,
       );
     }
 
