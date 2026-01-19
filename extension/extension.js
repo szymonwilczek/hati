@@ -15,6 +15,10 @@ import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 import { parseColor } from "./utils.js";
+import {
+  buildDrawSettings,
+  calculateCanvasSize,
+} from "./modules/style-manager.js";
 import { Physics } from "./modules/physics.js";
 import { Glow } from "./modules/glow.js";
 import { getAnimation } from "./animations/animations.js";
@@ -811,89 +815,18 @@ export default class HatiExtension extends Extension {
   _refreshStyle() {
     if (!this._highlightActor || !this._containerActor) return;
 
-    const size = this._settings.get_int("size");
-    let colorString = this._settings.get_string("color");
+    this._drawSettings = buildDrawSettings({
+      settings: this._settings,
+      interfaceSettings: this._interfaceSettings,
+      glow: this._glow,
+    });
 
-    // system accent override
-    if (
-      this._interfaceSettings &&
-      this._settings.get_boolean("use-system-accent")
-    ) {
-      const accent = this._interfaceSettings.get_string("accent-color");
-      const ACCENT_COLORS = {
-        blue: "rgba(53, 132, 228, 1)",
-        teal: "rgba(99, 193, 190, 1)",
-        green: "rgba(51, 209, 122, 1)",
-        yellow: "rgba(246, 211, 45, 1)",
-        orange: "rgba(255, 120, 0, 1)",
-        red: "rgba(224, 27, 36, 1)",
-        pink: "rgba(213, 97, 157, 1)",
-        purple: "rgba(145, 65, 172, 1)",
-        slate: "rgba(119, 118, 123, 1)",
-        default: "rgba(53, 132, 228, 1)",
-      };
-      if (ACCENT_COLORS[accent]) {
-        colorString = ACCENT_COLORS[accent];
-      }
-    }
-
-    const color = parseColor(colorString);
-    const borderWeight = this._settings.get_int("border-weight");
-    const gap = this._settings.get_double("gap");
-    const opacity = this._settings.get_double("opacity");
-    const cornerRadius = this._settings.get_int("corner-radius");
-    const rotation = this._settings.get_int("rotation");
-
-    // Glow
-    const glow = this._glow ? this._glow.isEnabled() : false;
-    const glowRadius = this._glow ? this._glow.getRadius() : 0;
-    const glowSpread = this._glow ? this._glow.getSpread() : 0;
-
-    // Click Animations
-    const clickAnimations = this._settings.get_boolean("click-animations");
-    const clickAnimationMode = this._settings.get_string(
-      "click-animation-mode",
-    );
-
-    // Shape
-    const maxRadius = size / 2;
-    const radiusPx = Math.round(maxRadius * (cornerRadius / 50.0));
-    const radius = `${radiusPx}px`;
-
-    // Store settings for draw callback
-    this._drawSettings = {
-      size: size,
-      borderWeight: borderWeight,
-      gap: gap,
-      color: color,
-      radiusPx: radiusPx,
-      opacity: opacity,
-      rotation: rotation,
-      glow: glow,
-      glowRadius: glowRadius,
-      glowSpread: glowSpread,
-      clickAnimations: clickAnimations,
-      clickAnimationMode: this._settings.get_string("click-animation-mode"),
-      dashedBorder: this._settings.get_boolean("dashed-border"),
-      dashGapSize: this._settings.get_double("dash-gap-size"),
-      useSystemAccent: this._settings.get_boolean("use-system-accent"),
-      leftClickColor: parseColor(this._settings.get_string("left-click-color")),
-      rightClickColor: parseColor(
-        this._settings.get_string("right-click-color"),
-      ),
-    };
-
-    // Canvas sizing and invalidation
-    // Calculate padding based on glow to prevent clipping
-    const padding = this._glow ? this._glow.calculatePadding() : 20;
-    const totalSize = size + padding * 2;
+    const totalSize = calculateCanvasSize(this._drawSettings.size, this._glow);
 
     this._containerActor.set_size(totalSize, totalSize);
     this._canvas.set_size(totalSize, totalSize);
     this._canvas.queue_repaint();
 
-    // Don't apply opacity to container - Cairo handles all transparency
-    // This prevents double-opacity multiplication
     this._containerActor.set_opacity(255);
   }
 
