@@ -24,7 +24,7 @@ import { Glow } from "./modules/glow.js";
 import { getAnimation } from "./animations/animations.js";
 import { renderHighlight } from "./modules/highlight-renderer.js";
 import { initShaders } from "./shaders/shaders.js";
-import { MagnifierClipEffect } from "./shaders/magnifier-clip-effect.js";
+import { Magnifier } from "./modules/magnifier.js";
 
 export default class HatiExtension extends Extension {
   constructor(metadata) {
@@ -136,44 +136,16 @@ export default class HatiExtension extends Extension {
     this._outerRing = this._canvas;
     this._innerRing = null;
 
-    this._magnifierGroup = new St.Widget({
-      style: "background-color: transparent;",
-      visible: false,
-      width: 300,
-      height: 300,
-      clip_to_allocation: true,
-      offscreen_redirect: Clutter.OffscreenRedirect.ALWAYS,
-    });
+    // Physics
+    this._physics = new Physics(this._settings);
+    this._tickId = 0;
 
-    // CONTENT GROUP: will hold the clones and apply counter-rotation
-    this._contentGroup = new St.Widget({
-      width: 300,
-      height: 300,
-    });
-    this._magnifierGroup.add_child(this._contentGroup);
+    // Glow
+    this._glow = new Glow(this._settings);
 
-    // magnifier activation state
-    this._magnifierActive = false;
-    this._magnifierKeyPressed = false;
-
-    // shader effect for rounded clipping
-    this._clipEffect = null;
-
-    const monitor = Main.layoutManager.primaryMonitor;
-
-    // LAYER 1: Background - try to get actual background content
-    this._bgClone = null;
-
-    // LAYER 2: All Windows (Dynamic) - updated each tick
-    this._windowClones = [];
-    this._lastWindowSnapshot = null;
-
-    // LAYER 3: Panel (Top Bar) - always on top
-
-    // ensure visibility over fullscreen apps
-    Main.layoutManager.addChrome(this._magnifierGroup, {
-      trackFullscreen: true,
-    }); // hidden by default
+    // Magnifier
+    this._magnifier = new Magnifier(this._settings, this._physics);
+    this._magnifier.init();
 
     // magnifier activation
     this._stageEventId = global.stage.connect(
@@ -182,13 +154,6 @@ export default class HatiExtension extends Extension {
         return this._onStageEvent(event);
       },
     );
-
-    // Physics
-    this._physics = new Physics(this._settings);
-    this._tickId = 0;
-
-    // Glow
-    this._glow = new Glow(this._settings);
 
     // Initial Style
     this._refreshStyle();
@@ -204,7 +169,7 @@ export default class HatiExtension extends Extension {
       return GLib.SOURCE_CONTINUE;
     });
 
-    console.log("[Hati] Highlight actor created (CSS Mode - Reverted)");
+    console.log("[Hati] Highlight actor created (Modular Magnifier)");
   }
 
   _updatePhysicsConstants() {
@@ -230,17 +195,9 @@ export default class HatiExtension extends Extension {
       this._containerActor.destroy();
       this._containerActor = null;
 
-      if (this._magnifierGroup) {
-        Main.layoutManager.removeChrome(this._magnifierGroup);
-        this._magnifierGroup.destroy();
-        this._magnifierGroup = null;
-      }
-      this._magnifierClone = null;
-
-      if (this._magnifierGhost) {
-        Main.uiGroup.remove_child(this._magnifierGhost);
-        this._magnifierGhost.destroy();
-        this._magnifierGhost = null;
+      if (this._magnifier) {
+        this._magnifier.destroy();
+        this._magnifier = null;
       }
 
       this._outerRing = null;
@@ -250,298 +207,10 @@ export default class HatiExtension extends Extension {
 
   // MAGNIFIER: Key Event Handler
   _onStageEvent(event) {
-    // only handle key events
-    const type = event.type();
-    if (
-      type !== Clutter.EventType.KEY_PRESS &&
-      type !== Clutter.EventType.KEY_RELEASE
-    ) {
-      return Clutter.EVENT_PROPAGATE;
-    }
-
-    const activationKey =
-      this._settings.get_string("magnifier-key") || "Shift_L";
-    const keyName = event.get_key_symbol();
-
-    const keyMap = {
-      Shift_L: Clutter.KEY_Shift_L,
-      Shift_R: Clutter.KEY_Shift_R,
-      Control_L: Clutter.KEY_Control_L,
-      Control_R: Clutter.KEY_Control_R,
-      Alt_L: Clutter.KEY_Alt_L,
-      Alt_R: Clutter.KEY_Alt_R,
-      Super_L: Clutter.KEY_Super_L,
-      Super_R: Clutter.KEY_Super_R,
-    };
-
-    const targetKey = keyMap[activationKey] || Clutter.KEY_Shift_L;
-
-    if (keyName !== targetKey) {
-      return Clutter.EVENT_PROPAGATE;
-    }
-
-    if (type === Clutter.EventType.KEY_PRESS && !this._magnifierKeyPressed) {
-      // KEY DOWN - activate magnifier
-      this._magnifierKeyPressed = true;
-      this._activateMagnifier();
-      return Clutter.EVENT_STOP;
-    } else if (
-      type === Clutter.EventType.KEY_RELEASE &&
-      this._magnifierKeyPressed
-    ) {
-      // KEY UP - deactivate magnifier
-      this._magnifierKeyPressed = false;
-      this._deactivateMagnifier();
+    if (this._magnifier && this._magnifier.handleKeyEvent(event)) {
       return Clutter.EVENT_STOP;
     }
-
     return Clutter.EVENT_PROPAGATE;
-  }
-
-  // MAGNIFIER: Activation
-  _activateMagnifier() {
-    // check if interrupting an exit animation
-    const isInterruptedExit =
-      this._magnifierGroup.visible && this._magnifierGroup.opacity > 0;
-    if (this._magnifierActive && !isInterruptedExit) {
-      // if active, full visibility and cancel any exit animations
-      this._magnifierGroup.remove_all_transitions();
-      this._magnifierGroup.opacity = 255;
-      this._magnifierGroup.set_scale(1.0, 1.0);
-      this._magnifierGroup.visible = true;
-      this._magnifierActive = true;
-      return;
-    }
-
-    console.log("[Hati] Magnifier ACTIVATED (Spring Pop)");
-    this._magnifierActive = true;
-
-    // stop any running animations
-    this._magnifierGroup.remove_all_transitions();
-
-    if (isInterruptedExit) {
-      // SOFT REACTIVATION: keep physics/position context
-      console.log("[Hati] Soft Reactivation (Interrupted Exit)");
-    } else {
-      // HARD ACTIVATION: reset everything
-      this._magnifierGroup.opacity = 0;
-      this._magnifierGroup.set_scale(0.5, 0.5);
-
-      // sync position immediately to prevent flicker/jump from old position
-      const [pointerX, pointerY] = global.get_pointer();
-      this._physics.reset(pointerX, pointerY);
-    }
-
-    // create clones on-demand
-    const monitor = Main.layoutManager.primaryMonitor;
-    this._tryCreateBackgroundClone(monitor);
-    this._rebuildWindowClones();
-
-    // create panel clone if not exists
-    if (!this._panelClone) {
-      const panelSource = Main.layoutManager.panelBox;
-      if (panelSource) {
-        this._panelClone = new Clutter.Clone({
-          source: panelSource,
-          reactive: false,
-        });
-        this._contentGroup.add_child(this._panelClone);
-      }
-    }
-
-    // create and apply rounded corners clipping effect
-    if (!this._clipEffect) {
-      this._clipEffect = new MagnifierClipEffect();
-      this._magnifierGroup.add_effect(this._clipEffect);
-      console.log("[Hati] Clip effect added to magnifier");
-    }
-
-    // force one tick update to position everything correctly BEFORE showing
-    this._tick();
-
-    // Show and Animate
-    this._magnifierGroup.visible = true;
-
-    this._magnifierGroup.ease({
-      opacity: 255,
-      scale_x: 1.0,
-      scale_y: 1.0,
-      duration: 250,
-      mode: Clutter.AnimationMode.EASE_OUT_EXPO,
-    });
-  }
-
-  // MAGNIFIER: Deactivation
-  _deactivateMagnifier() {
-    if (!this._magnifierActive) return;
-
-    console.log("[Hati] Magnifier DEACTIVATED (Spring Pop Exit)");
-    this._magnifierActive = false;
-
-    // stop any entrance animation
-    this._magnifierGroup.remove_all_transitions();
-
-    // animate out
-    this._magnifierGroup.ease({
-      opacity: 0,
-      scale_x: 0.8,
-      scale_y: 0.8,
-      duration: 150,
-      mode: Clutter.AnimationMode.EASE_IN_QUART,
-      onComplete: () => {
-        // only clean up if still inactive
-        if (!this._magnifierActive) {
-          this._magnifierGroup.visible = false;
-          this._cleanupMagnifierResources();
-        }
-      },
-    });
-  }
-
-  _cleanupMagnifierResources() {
-    if (this._bgClone) {
-      this._contentGroup.remove_child(this._bgClone);
-      this._bgClone.destroy();
-      this._bgClone = null;
-    }
-
-    this._windowClones.forEach((clone) => {
-      if (clone) {
-        this._contentGroup.remove_child(clone);
-        clone.destroy();
-      }
-    });
-    this._windowClones = [];
-
-    if (this._panelClone) {
-      this._contentGroup.remove_child(this._panelClone);
-      this._panelClone.destroy();
-      this._panelClone = null;
-    }
-
-    // Remove shader effect
-    if (this._clipEffect) {
-      this._magnifierGroup.remove_effect(this._clipEffect);
-      this._clipEffect = null;
-    }
-  }
-
-  _startCursorTracking() {}
-  _stopCursorTracking() {}
-
-  // MAGNIFIER HELPER: background clone
-  _tryCreateBackgroundClone(monitor) {
-    if (this._bgClone) return;
-
-    try {
-      const bgManagers = Main.layoutManager._bgManagers;
-      if (bgManagers && bgManagers.length > 0) {
-        // get the background actor for primary monitor
-        const bgManager = bgManagers[0];
-        if (bgManager && bgManager.backgroundActor) {
-          this._bgClone = new Clutter.Clone({
-            source: bgManager.backgroundActor,
-            reactive: false,
-          });
-          this._bgClone._sourceActor = { x: 0, y: 0 }; // background is at 0,0
-          this._contentGroup.insert_child_at_index(this._bgClone, 0);
-          console.log(`[Hati] Background clone created successfully!`);
-          return;
-        }
-      }
-    } catch (e) {
-      console.log(`[Hati] Failed to get background via bgManagers: ${e}`);
-    }
-
-    // fallback: try layoutManager.backgroundGroup first child
-    try {
-      const bgGroup = Main.layoutManager.backgroundGroup;
-      if (bgGroup && bgGroup.get_n_children() > 0) {
-        const bgActor = bgGroup.get_child_at_index(0);
-        if (bgActor) {
-          this._bgClone = new Clutter.Clone({
-            source: bgActor,
-            reactive: false,
-          });
-          this._bgClone._sourceActor = { x: 0, y: 0 };
-          this._contentGroup.insert_child_at_index(this._bgClone, 0);
-          console.log(`[Hati] Background clone (fallback) created!`);
-          return;
-        }
-      }
-    } catch (e) {
-      console.log(`[Hati] Background fallback also failed: ${e}`);
-    }
-
-    console.log(`[Hati] No background clone could be created`);
-  }
-
-  // MAGNIFIER HELPER: Rebuild All Window Clones
-  _rebuildWindowClones() {
-    if (!this._magnifierGroup) return;
-
-    // clean up old clones
-    this._windowClones.forEach((clone) => {
-      if (clone) {
-        this._contentGroup.remove_child(clone);
-        clone.destroy();
-      }
-    });
-    this._windowClones = [];
-
-    // get all windows on the current workspace
-    const workspace = global.workspace_manager.get_active_workspace();
-    const windows = workspace.list_windows();
-
-    // sort by stacking order (bottom to top)
-    windows.sort((a, b) => {
-      const actorA = a.get_compositor_private();
-      const actorB = b.get_compositor_private();
-      if (!actorA || !actorB) return 0;
-      // lower z-index first
-      return (
-        global.window_group.get_child_index(actorA) -
-        global.window_group.get_child_index(actorB)
-      );
-    });
-
-    // clone each visible window
-    for (const win of windows) {
-      // skip minimized, hidden, or special windows
-      if (win.is_hidden() || win.minimized) continue;
-
-      const actor = win.get_compositor_private();
-      if (!actor || !actor.visible) continue;
-
-      try {
-        const clone = new Clutter.Clone({
-          source: actor,
-          reactive: false,
-        });
-        // store source reference for coordinate math
-        clone._sourceActor = actor;
-
-        // insert above background, below panel
-        const insertIndex = this._bgClone ? 1 : 0;
-        this._contentGroup.insert_child_at_index(
-          clone,
-          insertIndex + this._windowClones.length,
-        );
-
-        this._windowClones.push(clone);
-      } catch (e) {
-        console.log(`[Hati] Failed to clone window: ${win.get_title()}: ${e}`);
-      }
-    }
-  }
-
-  _getActivationMask() {
-    const key = this._settings.get_string("magnifier-key") || "Shift_L";
-    if (key.includes("Shift")) return Clutter.ModifierType.SHIFT_MASK;
-    if (key.includes("Control")) return Clutter.ModifierType.CONTROL_MASK;
-    if (key.includes("Alt")) return Clutter.ModifierType.MOD1_MASK;
-    if (key.includes("Super")) return Clutter.ModifierType.SUPER_MASK;
-    return Clutter.ModifierType.SHIFT_MASK; // Default fallback
   }
 
   _tick() {
@@ -553,21 +222,17 @@ export default class HatiExtension extends Extension {
     const containerHeight = this._containerActor.get_height();
 
     // Activation Polling Logic
-    const activationMask = this._getActivationMask();
-    const isPressed = (mask & activationMask) !== 0;
-
-    if (isPressed) {
-      if (!this._magnifierActive) {
-        this._activateMagnifier();
-      }
-    } else {
-      if (this._magnifierActive) {
-        this._deactivateMagnifier();
-      }
+    if (this._magnifier) {
+      this._magnifier.pollActivation(mask);
     }
 
     // Physics Update
     const [curX, curY] = this._physics.update(pointerX, pointerY);
+
+    // Magnifier Update
+    if (this._magnifier) {
+      this._magnifier.update(curX, curY);
+    }
 
     // --- Click Animation Logic ---
     if (!this._clickState) {
@@ -660,120 +325,6 @@ export default class HatiExtension extends Extension {
 
     // Scale highlight actor
     this._highlightActor.set_scale(scaleX, scaleY);
-
-    // Update Magnifier Position & Zoom (only when active)
-    if (this._magnifierGroup && this._magnifierActive) {
-      const size = this._settings.get_int("size") || 100;
-      const zoom = this._settings.get_double("magnifier-zoom") || 2.0;
-      const borderWeight = this._settings.get_int("border-weight") || 4;
-      const gap = this._settings.get_double("gap") || 1.0;
-      const cornerRadius = this._settings.get_int("corner-radius") || 50;
-      const rotation = this._settings.get_int("rotation") || 0;
-
-      // FULL DESKTOP CLONING
-      // rebuild window clones periodically
-      if (
-        !this._lastWindowRebuild ||
-        Date.now() - this._lastWindowRebuild > 500 // every ~500ms to avoid perf hit
-      ) {
-        this._rebuildWindowClones();
-        this._lastWindowRebuild = Date.now();
-      }
-
-      // MAGNIFIER SIZE: should fit to inner edge of OUTER ring
-      // Geometry: outerHalf = size/2, outer ring thickness = borderWeight
-      // Inner edge of outer ring = outerHalf - borderWeight
-      const outerHalf = size / 2;
-      const innerEdgeOfOuterRing = outerHalf - borderWeight;
-      const magnifierDiameter = Math.max(20, innerEdgeOfOuterRing * 2);
-
-      // calculate corner radius proportionally
-      const maxRadiusPx = magnifierDiameter / 2;
-      const magnifierRadius = Math.round(maxRadiusPx * (cornerRadius / 50.0));
-
-      // DEBUG LOGGING
-      if (!this._lastLogTime || Date.now() - this._lastLogTime > 2000) {
-        console.log(
-          `[Hati Magnifier] size=${size}, borderWeight=${borderWeight}, cornerRadius=${cornerRadius}`,
-        );
-        console.log(
-          `[Hati Magnifier] outerHalf=${outerHalf}, innerEdgeOfOuterRing=${innerEdgeOfOuterRing}`,
-        );
-        console.log(
-          `[Hati Magnifier] magnifierDiameter=${magnifierDiameter}, magnifierRadius=${magnifierRadius}`,
-        );
-        console.log(`[Hati Magnifier] rotation=${rotation}`);
-        this._lastLogTime = Date.now();
-      }
-
-      this._magnifierGroup.set_size(magnifierDiameter, magnifierDiameter);
-
-      // update shader effect uniforms for rounded clipping
-      if (this._clipEffect) {
-        this._clipEffect.updateUniforms(
-          magnifierDiameter,
-          magnifierDiameter,
-          magnifierRadius,
-        );
-      }
-
-      // apply rotation around center (frame rotates clockwise)
-      this._magnifierGroup.set_pivot_point(0.5, 0.5);
-      this._magnifierGroup.set_rotation_angle(
-        Clutter.RotateAxis.Z_AXIS,
-        rotation,
-      );
-
-      // update content group size and apply counter-rotation (content rotates counter-clockwise)
-      // this keeps the content upright while the frame rotates
-      this._contentGroup.set_size(magnifierDiameter, magnifierDiameter);
-      this._contentGroup.set_pivot_point(0.5, 0.5);
-      this._contentGroup.set_rotation_angle(
-        Clutter.RotateAxis.Z_AXIS,
-        -rotation,
-      );
-
-      this._magnifierGroup.set_position(
-        curX - magnifierDiameter / 2,
-        curY - magnifierDiameter / 2,
-      );
-
-      // transform all layers
-      const allLayers = [
-        ...this._windowClones,
-        this._bgClone,
-        this._panelClone,
-      ].filter((x) => x);
-
-      allLayers.forEach((clone) => {
-        if (!clone) return;
-
-        let sourceX = 0;
-        let sourceY = 0;
-
-        // windows have positions, background and panel are at 0,0
-        if (clone._sourceActor) {
-          sourceX = clone._sourceActor.x;
-          sourceY = clone._sourceActor.y;
-        }
-
-        clone.set_scale(zoom, zoom);
-        clone.set_translation(
-          magnifierDiameter / 2 - (curX - sourceX) * zoom,
-          magnifierDiameter / 2 - (curY - sourceY) * zoom,
-          0,
-        );
-      });
-    }
-
-    // update ghost position
-    if (this._magnifierGhost) {
-      const ghostSize = 100;
-      this._magnifierGhost.set_position(
-        curX - ghostSize / 2,
-        curY - ghostSize / 2,
-      );
-    }
 
     return Clutter.TICK_CONTINUE;
   }
