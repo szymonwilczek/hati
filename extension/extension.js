@@ -17,6 +17,7 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { parseColor } from "./utils.js";
 import { Physics } from "./modules/physics.js";
 import { Glow } from "./modules/glow.js";
+import { getAnimation } from "./animations/animations.js";
 
 // GLSL Shader for rounded corners clipping
 const SHADER_DECLARATIONS = `
@@ -1045,29 +1046,13 @@ export default class HatiExtension extends Extension {
       drawColor.r = drawColor.r * (1 - blend) + targetR * blend;
       drawColor.g = drawColor.g * (1 - blend) + targetG * blend;
       drawColor.b = drawColor.b * (1 - blend) + targetB * blend;
-      // Alpha remains user setting usually, or we can boost it? Keep user setting.
 
-      // 2. Shape Deformation
-      if (clickAnimationMode === "ripple") {
-        // Ripple: Squeeze to center
-        // Scale down to 80% at peak
-        const scale = 1.0 - progress * 0.2;
-        animScaleX = scale;
-        animScaleY = scale;
-      } else {
-        // Directional: Squeeze to side
-        // Scale width down to 70%
-        animScaleX = 1.0 - progress * 0.3;
-        // Shift to keep anchor
-        const shift = ((size * 0.3) / 2) * progress; // Shift by half the lost width
-        if (button === "left") {
-          // Squeeze to Left -> Move Left (visual squeeze towards left edge)
-          animTranslateX = -shift;
-        } else {
-          // Squeeze to Right -> Move Right
-          animTranslateX = shift;
-        }
-      }
+      // Shape Deformation (from animation module)
+      const animation = getAnimation(clickAnimationMode, this._settings);
+      const transforms = animation.calculate({ progress, button, size });
+      animScaleX = transforms.scaleX;
+      animScaleY = transforms.scaleY;
+      animTranslateX = transforms.translateX;
     }
     // --- End Animation Calculation ---
 
