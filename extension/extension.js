@@ -16,6 +16,7 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 import { parseColor } from "./utils.js";
 import { Physics } from "./modules/physics.js";
+import { Glow } from "./modules/glow.js";
 
 // GLSL Shader for rounded corners clipping
 const SHADER_DECLARATIONS = `
@@ -266,6 +267,9 @@ export default class HatiExtension extends Extension {
     // Physics
     this._physics = new Physics(this._settings);
     this._tickId = 0;
+
+    // Glow
+    this._glow = new Glow(this._settings);
 
     // Initial Style
     this._refreshStyle();
@@ -880,6 +884,12 @@ export default class HatiExtension extends Extension {
       return;
     }
 
+    if (key === "glow" || key === "glow-radius" || key === "glow-spread") {
+      if (this._glow) {
+        this._glow.updateConstants();
+      }
+    }
+
     this._refreshStyle();
   }
 
@@ -920,9 +930,9 @@ export default class HatiExtension extends Extension {
     const rotation = this._settings.get_int("rotation");
 
     // Glow
-    const glow = this._settings.get_boolean("glow");
-    const glowRadius = this._settings.get_int("glow-radius");
-    const glowSpread = this._settings.get_int("glow-spread");
+    const glow = this._glow ? this._glow.isEnabled() : false;
+    const glowRadius = this._glow ? this._glow.getRadius() : 0;
+    const glowSpread = this._glow ? this._glow.getSpread() : 0;
 
     // Click Animations
     const clickAnimations = this._settings.get_boolean("click-animations");
@@ -960,8 +970,7 @@ export default class HatiExtension extends Extension {
 
     // Canvas sizing and invalidation
     // Calculate padding based on glow to prevent clipping
-    const glowPadding = glow ? glowRadius + glowSpread + 20 : 20;
-    const padding = glowPadding;
+    const padding = this._glow ? this._glow.calculatePadding() : 20;
     const totalSize = size + padding * 2;
 
     this._containerActor.set_size(totalSize, totalSize);
@@ -1111,41 +1120,19 @@ export default class HatiExtension extends Extension {
     const innerRadius = Math.max(0, radiusPx - outerBorderWidth - gap);
 
     // 0. GLOW EFFECT (Behind everything)
-    if (glow && glowRadius > 0) {
-      cr.save();
-      const glowPathHalfW = outerHalf; // Outer edge of outer ring
-
-      cr.rectangle(-width, -height, width * 2, height * 2); // Universe
-      drawRoundedRect(outerHalf - outerBorderWidth, outerRadius); // Inner edge of outer ring?
-
-      // Draw Glow with BLENDED color
-      cr.setSourceRGBA(
-        drawColor.r,
-        drawColor.g,
-        drawColor.b,
-        (drawColor.a * 0.5) / 10,
+    if (this._glow) {
+      this._glow.draw(
+        cr,
+        {
+          outerHalf,
+          outerRadius,
+          outerBorderWidth,
+          drawColor,
+          width,
+          height,
+        },
+        drawRoundedRect,
       );
-
-      // Simulate blur with multiple strokes
-      const steps = 10;
-      for (let i = 0; i < steps; i++) {
-        const spread = glowSpread + glowRadius * (i / steps);
-        cr.setLineWidth(outerBorderWidth + spread);
-        drawRoundedRect(outerHalf - outerBorderWidth / 2, outerRadius);
-        cr.stroke();
-      }
-
-      // Clip Inner Region (Cleanup)
-      cr.setOperator(0); // CLEAR
-      cr.setSourceRGBA(0, 0, 0, 1);
-      cr.setLineWidth(1);
-      drawRoundedRect(
-        outerHalf - outerBorderWidth,
-        Math.max(0, outerRadius - outerBorderWidth),
-      );
-      cr.fill(); // This eats the inner bleed
-
-      cr.restore(); // Restore context (operator, etc)
     }
 
     // 1. DRAW OUTER RING (100% Opaque)
