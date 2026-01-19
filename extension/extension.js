@@ -14,6 +14,8 @@ import Cairo from "gi://cairo";
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
+import { parseColor } from "./utils.js";
+
 // GLSL Shader for rounded corners clipping
 const SHADER_DECLARATIONS = `
 uniform vec4 bounds;
@@ -940,7 +942,7 @@ export default class HatiExtension extends Extension {
       }
     }
 
-    const color = this._parseColor(colorString);
+    const color = parseColor(colorString);
     const borderWeight = this._settings.get_int("border-weight");
     const gap = this._settings.get_double("gap");
     const opacity = this._settings.get_double("opacity");
@@ -980,10 +982,8 @@ export default class HatiExtension extends Extension {
       dashedBorder: this._settings.get_boolean("dashed-border"),
       dashGapSize: this._settings.get_double("dash-gap-size"),
       useSystemAccent: this._settings.get_boolean("use-system-accent"),
-      leftClickColor: this._parseColor(
-        this._settings.get_string("left-click-color"),
-      ),
-      rightClickColor: this._parseColor(
+      leftClickColor: parseColor(this._settings.get_string("left-click-color")),
+      rightClickColor: parseColor(
         this._settings.get_string("right-click-color"),
       ),
     };
@@ -1227,35 +1227,5 @@ export default class HatiExtension extends Extension {
 
     // dispose context when done
     cr.$dispose();
-  }
-
-  _getShapeValue(shapeString) {
-    switch (shapeString) {
-      case "circle":
-        return 0.0;
-      case "squircle":
-        return 1.0;
-      case "square":
-        return 2.0;
-      default:
-        return 0.0;
-    }
-  }
-
-  _parseColor(colorString) {
-    const match = colorString.match(
-      /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/,
-    );
-
-    if (match) {
-      return {
-        red: parseInt(match[1]),
-        green: parseInt(match[2]),
-        blue: parseInt(match[3]),
-        alpha: match[4] ? parseFloat(match[4]) : 1.0,
-      };
-    }
-
-    return { red: 99, green: 162, blue: 255, alpha: 0.7 };
   }
 }
