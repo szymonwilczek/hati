@@ -379,17 +379,40 @@ export default class HatiExtension extends Extension {
 
   // MAGNIFIER: Activation
   _activateMagnifier() {
-    if (this._magnifierActive) return;
+    // check if interrupting an exit animation
+    const isInterruptedExit =
+      this._magnifierGroup.visible && this._magnifierGroup.opacity > 0;
+    if (this._magnifierActive && !isInterruptedExit) {
+      // if active, full visibility and cancel any exit animations
+      this._magnifierGroup.remove_all_transitions();
+      this._magnifierGroup.opacity = 255;
+      this._magnifierGroup.set_scale(1.0, 1.0);
+      this._magnifierGroup.visible = true;
+      this._magnifierActive = true;
+      return;
+    }
 
-    console.log("[Hati] Magnifier ACTIVATED");
+    console.log("[Hati] Magnifier ACTIVATED (Spring Pop)");
     this._magnifierActive = true;
 
-    // sync position immediately to prevent flicker/jump from old position
-    const [pointerX, pointerY] = global.get_pointer();
-    this._currentX = pointerX;
-    this._currentY = pointerY;
-    this._velocityX = 0;
-    this._velocityY = 0;
+    // stop any running animations
+    this._magnifierGroup.remove_all_transitions();
+
+    if (isInterruptedExit) {
+      // SOFT REACTIVATION: keep physics/position context
+      console.log("[Hati] Soft Reactivation (Interrupted Exit)");
+    } else {
+      // HARD ACTIVATION: reset everything
+      this._magnifierGroup.opacity = 0;
+      this._magnifierGroup.set_scale(0.5, 0.5);
+
+      // sync position immediately to prevent flicker/jump from old position
+      const [pointerX, pointerY] = global.get_pointer();
+      this._currentX = pointerX;
+      this._currentY = pointerY;
+      this._velocityX = 0;
+      this._velocityY = 0;
+    }
 
     // create clones on-demand
     const monitor = Main.layoutManager.primaryMonitor;
@@ -418,19 +441,46 @@ export default class HatiExtension extends Extension {
     // force one tick update to position everything correctly BEFORE showing
     this._tick();
 
-    // now safe to show
+    // Show and Animate
     this._magnifierGroup.visible = true;
+
+    this._magnifierGroup.ease({
+      opacity: 255,
+      scale_x: 1.0,
+      scale_y: 1.0,
+      duration: 250,
+      mode: Clutter.AnimationMode.EASE_OUT_EXPO,
+    });
   }
 
   // MAGNIFIER: Deactivation
   _deactivateMagnifier() {
     if (!this._magnifierActive) return;
 
-    console.log("[Hati] Magnifier DEACTIVATED");
+    console.log("[Hati] Magnifier DEACTIVATED (Spring Pop Exit)");
     this._magnifierActive = false;
-    this._magnifierGroup.visible = false;
 
-    // destroy all clones to free resources
+    // stop any entrance animation
+    this._magnifierGroup.remove_all_transitions();
+
+    // animate out
+    this._magnifierGroup.ease({
+      opacity: 0,
+      scale_x: 0.8,
+      scale_y: 0.8,
+      duration: 150,
+      mode: Clutter.AnimationMode.EASE_IN_QUART,
+      onComplete: () => {
+        // only clean up if still inactive
+        if (!this._magnifierActive) {
+          this._magnifierGroup.visible = false;
+          this._cleanupMagnifierResources();
+        }
+      },
+    });
+  }
+
+  _cleanupMagnifierResources() {
     if (this._bgClone) {
       this._contentGroup.remove_child(this._bgClone);
       this._bgClone.destroy();
@@ -463,6 +513,8 @@ export default class HatiExtension extends Extension {
 
   // MAGNIFIER HELPER: background clone
   _tryCreateBackgroundClone(monitor) {
+    if (this._bgClone) return;
+
     try {
       const bgManagers = Main.layoutManager._bgManagers;
       if (bgManagers && bgManagers.length > 0) {
