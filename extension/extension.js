@@ -383,7 +383,13 @@ export default class HatiExtension extends Extension {
 
     console.log("[Hati] Magnifier ACTIVATED");
     this._magnifierActive = true;
-    this._magnifierGroup.visible = true;
+
+    // sync position immediately to prevent flicker/jump from old position
+    const [pointerX, pointerY] = global.get_pointer();
+    this._currentX = pointerX;
+    this._currentY = pointerY;
+    this._velocityX = 0;
+    this._velocityY = 0;
 
     // create clones on-demand
     const monitor = Main.layoutManager.primaryMonitor;
@@ -408,6 +414,12 @@ export default class HatiExtension extends Extension {
       this._magnifierGroup.add_effect(this._clipEffect);
       console.log("[Hati] Clip effect added to magnifier");
     }
+
+    // force one tick update to position everything correctly BEFORE showing
+    this._tick();
+
+    // now safe to show
+    this._magnifierGroup.visible = true;
   }
 
   // MAGNIFIER: Deactivation
