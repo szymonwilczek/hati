@@ -247,7 +247,10 @@ export default class HatiExtension extends Extension {
 
     // LAYER 3: Panel (Top Bar) - always on top
 
-    Main.uiGroup.add_child(this._magnifierGroup); // hidden by default
+    // ensure visibility over fullscreen apps
+    Main.layoutManager.addChrome(this._magnifierGroup, {
+      trackFullscreen: true,
+    }); // hidden by default
 
     // magnifier activation
     this._stageEventId = global.stage.connect(
@@ -273,7 +276,9 @@ export default class HatiExtension extends Extension {
     this._refreshStyle();
 
     // Add to UI
-    Main.uiGroup.add_child(this._containerActor);
+    Main.layoutManager.addChrome(this._containerActor, {
+      trackFullscreen: true,
+    });
 
     // Start Physics
     this._tickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
@@ -305,12 +310,12 @@ export default class HatiExtension extends Extension {
         this._stageEventId = null;
       }
 
-      Main.uiGroup.remove_child(this._containerActor);
+      Main.layoutManager.removeChrome(this._containerActor);
       this._containerActor.destroy();
       this._containerActor = null;
 
       if (this._magnifierGroup) {
-        Main.uiGroup.remove_child(this._magnifierGroup);
+        Main.layoutManager.removeChrome(this._magnifierGroup);
         this._magnifierGroup.destroy();
         this._magnifierGroup = null;
       }
@@ -617,13 +622,36 @@ export default class HatiExtension extends Extension {
     }
   }
 
+  _getActivationMask() {
+    const key = this._settings.get_string("magnifier-key") || "Shift_L";
+    if (key.includes("Shift")) return Clutter.ModifierType.SHIFT_MASK;
+    if (key.includes("Control")) return Clutter.ModifierType.CONTROL_MASK;
+    if (key.includes("Alt")) return Clutter.ModifierType.MOD1_MASK;
+    if (key.includes("Super")) return Clutter.ModifierType.SUPER_MASK;
+    return Clutter.ModifierType.SHIFT_MASK; // Default fallback
+  }
+
   _tick() {
     if (!this._containerActor || !this._highlightActor)
       return Clutter.TICK_STOP;
 
-    const [pointerX, pointerY] = global.get_pointer();
+    const [pointerX, pointerY, mask] = global.get_pointer();
     const containerWidth = this._containerActor.get_width();
     const containerHeight = this._containerActor.get_height();
+
+    // Activation Polling Logic
+    const activationMask = this._getActivationMask();
+    const isPressed = (mask & activationMask) !== 0;
+
+    if (isPressed) {
+      if (!this._magnifierActive) {
+        this._activateMagnifier();
+      }
+    } else {
+      if (this._magnifierActive) {
+        this._deactivateMagnifier();
+      }
+    }
 
     if (this._currentX === 0 && this._currentY === 0) {
       this._currentX = pointerX;
@@ -657,7 +685,6 @@ export default class HatiExtension extends Extension {
     }
 
     // detect button state from mask
-    const [, , mask] = global.get_pointer();
     const leftPressed = (mask & Clutter.ModifierType.BUTTON1_MASK) !== 0;
     const rightPressed = (mask & Clutter.ModifierType.BUTTON3_MASK) !== 0;
 
