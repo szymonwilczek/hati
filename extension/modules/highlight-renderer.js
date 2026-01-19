@@ -146,13 +146,13 @@ export function renderHighlight(area, params) {
     );
   }
 
-  // outer ring 
+  // outer ring
   cr.setSourceRGBA(drawColor.r, drawColor.g, drawColor.b, 1.0);
   cr.setLineWidth(outerBorderWidth);
   drawRect(outerHalf - outerBorderWidth / 2, outerRadius);
   cr.stroke();
 
-  // inner ring 
+  // inner ring
   const { opacity, dashedBorder, dashGapSize } = drawSettings;
   cr.setSourceRGBA(drawColor.r, drawColor.g, drawColor.b, opacity);
   cr.setLineWidth(innerBorderWidth);
