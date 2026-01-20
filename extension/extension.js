@@ -165,9 +165,7 @@ export default class HatiExtension extends Extension {
     this._refreshStyle();
 
     // Add to UI
-    Main.layoutManager.addChrome(this._containerActor, {
-      trackFullscreen: true,
-    });
+    global.stage.add_child(this._containerActor);
 
     // Start Physics
     this._tickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
@@ -197,7 +195,7 @@ export default class HatiExtension extends Extension {
         this._stageEventId = null;
       }
 
-      Main.layoutManager.removeChrome(this._containerActor);
+      global.stage.remove_child(this._containerActor);
       this._containerActor.destroy();
       this._containerActor = null;
 
