@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.hati.Highlighter" path="/org/hati/highlighter/">
+  <schema id="io.github.szymonwilczek.hati" path="/io/github/szymonwilczek/hati/">
     
     <key name="enabled" type="b">
       <default>false</default>

@@ -43,7 +43,7 @@ export default class HatiExtension extends Extension {
     // from external files
     initShaders(this.path);
 
-    this._settings = this.getSettings("org.hati.Highlighter");
+    this._settings = this.getSettings("io.github.szymonwilczek.hati");
     this._interfaceSettings = new Gio.Settings({
       schema_id: "org.gnome.desktop.interface",
     });

@@ -21,7 +21,7 @@ import { buildMagnifierGroup } from "./prefs/magnifier-group.js";
 
 export default class HatiPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
-    const settings = this.getSettings("org.hati.Highlighter");
+    const settings = this.getSettings("io.github.szymonwilczek.hati");
 
     // Appearance
     const appearancePage = new Adw.PreferencesPage({

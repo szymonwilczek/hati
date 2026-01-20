@@ -8,5 +8,5 @@
   ],
   "version": 1,
   "url": "https://github.com/szymonwilczek/hati",
-  "settings-schema": "org.hati.Highlighter"
+  "settings-schema": "io.github.szymonwilczek.hati"
 }
