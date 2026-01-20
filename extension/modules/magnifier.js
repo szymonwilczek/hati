@@ -6,6 +6,7 @@ import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 import { MagnifierClipEffect } from "../shaders/magnifier-clip-effect.js";
+import { SceneCloner } from "./scene-cloner.js";
 
 // key symbol mapping
 const KEY_MAP = {
@@ -29,21 +30,17 @@ export class Magnifier {
     this._contentGroup = null;
     this._clipEffect = null;
 
-    // clones
-    this._bgClone = null;
-    this._windowClones = [];
-    this._panelClone = null;
+    // scene cloner (manages bg, windows, panel clones)
+    this._sceneCloner = null;
 
     // state
     this._active = false;
     this._keyPressed = false;
-    this._lastWindowRebuild = null;
     this._lastLogTime = null;
   }
 
   /**
    * Initialize magnifier UI elements
-   * Call after extension UI is ready
    */
   init() {
     this._group = new St.Widget({
@@ -143,7 +140,7 @@ export class Magnifier {
   }
 
   /**
-   * Check activation state via polling (for modifier keys while windows have focus)
+   * Check activation state via polling
    * @param {number} mask - Current modifier mask
    */
   pollActivation(mask) {
@@ -185,10 +182,11 @@ export class Magnifier {
       this._physics.reset(pointerX, pointerY);
     }
 
-    // create clones
-    this._tryCreateBackgroundClone();
-    this._rebuildWindowClones();
-    this._createPanelClone();
+    // create scene cloner and init clones
+    if (!this._sceneCloner) {
+      this._sceneCloner = new SceneCloner(this._contentGroup);
+    }
+    this._sceneCloner.init();
 
     // create clip effect
     if (!this._clipEffect) {
@@ -246,15 +244,6 @@ export class Magnifier {
     const cornerRadius = this._settings.get_int("corner-radius") || 50;
     const rotation = this._settings.get_int("rotation") || 0;
 
-    // rebuild window clones periodically
-    if (
-      !this._lastWindowRebuild ||
-      Date.now() - this._lastWindowRebuild > 500
-    ) {
-      this._rebuildWindowClones();
-      this._lastWindowRebuild = Date.now();
-    }
-
     // calculate magnifier size
     const outerHalf = size / 2;
     const innerEdgeOfOuterRing = outerHalf - borderWeight;
@@ -295,162 +284,21 @@ export class Magnifier {
       curY - magnifierDiameter / 2,
     );
 
-    // transform clones
-    const allLayers = [
-      ...this._windowClones,
-      this._bgClone,
-      this._panelClone,
-    ].filter((x) => x);
-
-    allLayers.forEach((clone) => {
-      if (!clone) return;
-
-      let sourceX = 0;
-      let sourceY = 0;
-
-      if (clone._sourceActor) {
-        sourceX = clone._sourceActor.x;
-        sourceY = clone._sourceActor.y;
-      }
-
-      clone.set_scale(zoom, zoom);
-      clone.set_translation(
-        magnifierDiameter / 2 - (curX - sourceX) * zoom,
-        magnifierDiameter / 2 - (curY - sourceY) * zoom,
-        0,
-      );
-    });
+    // update scene clones
+    if (this._sceneCloner) {
+      this._sceneCloner.update(curX, curY, zoom, magnifierDiameter);
+    }
   }
 
-  // --- Private methods ---
-
   _cleanupResources() {
-    if (this._bgClone) {
-      this._contentGroup.remove_child(this._bgClone);
-      this._bgClone.destroy();
-      this._bgClone = null;
-    }
-
-    this._windowClones.forEach((clone) => {
-      if (clone) {
-        this._contentGroup.remove_child(clone);
-        clone.destroy();
-      }
-    });
-    this._windowClones = [];
-
-    if (this._panelClone) {
-      this._contentGroup.remove_child(this._panelClone);
-      this._panelClone.destroy();
-      this._panelClone = null;
+    if (this._sceneCloner) {
+      this._sceneCloner.destroy();
+      this._sceneCloner = null;
     }
 
     if (this._clipEffect && this._group) {
       this._group.remove_effect(this._clipEffect);
       this._clipEffect = null;
-    }
-  }
-
-  _tryCreateBackgroundClone() {
-    if (this._bgClone) return;
-
-    try {
-      const bgManagers = Main.layoutManager._bgManagers;
-      if (bgManagers && bgManagers.length > 0) {
-        const bgManager = bgManagers[0];
-        if (bgManager && bgManager.backgroundActor) {
-          this._bgClone = new Clutter.Clone({
-            source: bgManager.backgroundActor,
-            reactive: false,
-          });
-          this._bgClone._sourceActor = { x: 0, y: 0 };
-          this._contentGroup.insert_child_at_index(this._bgClone, 0);
-          return;
-        }
-      }
-    } catch (e) {
-      console.log(`[Hati Magnifier] bgManagers failed: ${e}`);
-    }
-
-    try {
-      const bgGroup = Main.layoutManager.backgroundGroup;
-      if (bgGroup && bgGroup.get_n_children() > 0) {
-        const bgActor = bgGroup.get_child_at_index(0);
-        if (bgActor) {
-          this._bgClone = new Clutter.Clone({
-            source: bgActor,
-            reactive: false,
-          });
-          this._bgClone._sourceActor = { x: 0, y: 0 };
-          this._contentGroup.insert_child_at_index(this._bgClone, 0);
-          return;
-        }
-      }
-    } catch (e) {
-      console.log(`[Hati Magnifier] backgroundGroup failed: ${e}`);
-    }
-  }
-
-  _rebuildWindowClones() {
-    if (!this._contentGroup) return;
-
-    this._windowClones.forEach((clone) => {
-      if (clone) {
-        this._contentGroup.remove_child(clone);
-        clone.destroy();
-      }
-    });
-    this._windowClones = [];
-
-    const workspace = global.workspace_manager.get_active_workspace();
-    const windows = workspace.list_windows();
-
-    windows.sort((a, b) => {
-      const actorA = a.get_compositor_private();
-      const actorB = b.get_compositor_private();
-      if (!actorA || !actorB) return 0;
-      return (
-        global.window_group.get_child_index(actorA) -
-        global.window_group.get_child_index(actorB)
-      );
-    });
-
-    for (const win of windows) {
-      if (win.is_hidden() || win.minimized) continue;
-
-      const actor = win.get_compositor_private();
-      if (!actor || !actor.visible) continue;
-
-      try {
-        const clone = new Clutter.Clone({
-          source: actor,
-          reactive: false,
-        });
-        clone._sourceActor = actor;
-
-        const insertIndex = this._bgClone ? 1 : 0;
-        this._contentGroup.insert_child_at_index(
-          clone,
-          insertIndex + this._windowClones.length,
-        );
-
-        this._windowClones.push(clone);
-      } catch (e) {
-        console.log(`[Hati Magnifier] Failed to clone: ${e}`);
-      }
-    }
-  }
-
-  _createPanelClone() {
-    if (this._panelClone) return;
-
-    const panelSource = Main.layoutManager.panelBox;
-    if (panelSource) {
-      this._panelClone = new Clutter.Clone({
-        source: panelSource,
-        reactive: false,
-      });
-      this._contentGroup.add_child(this._panelClone);
     }
   }
 }
