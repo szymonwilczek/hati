@@ -57,17 +57,18 @@ export function buildMagnifierGroup(settings) {
 
   // Activation Key
   const keyModel = new Gtk.StringList();
-  const keys = [
-    "Shift_L",
-    "Shift_R",
-    "Control_L",
-    "Control_R",
-    "Alt_L",
-    "Alt_R",
-    "Super_L",
-    "Super_R",
+  const keyMap = [
+    { name: "Left Shift", value: "Shift_L" },
+    { name: "Right Shift", value: "Shift_R" },
+    { name: "Left Ctrl", value: "Control_L" },
+    { name: "Right Ctrl", value: "Control_R" },
+    { name: "Left Alt", value: "Alt_L" },
+    { name: "Right Alt", value: "Alt_R" },
+    { name: "Left Super", value: "Super_L" },
+    { name: "Right Super", value: "Super_R" },
   ];
-  keys.forEach((key) => keyModel.append(key));
+
+  keyMap.forEach((k) => keyModel.append(k.name));
 
   const keyRow = new Adw.ComboRow({
     title: "Activation Key",
@@ -77,13 +78,13 @@ export function buildMagnifierGroup(settings) {
 
   // Set current key
   const currentKey = settings.get_string("magnifier-key");
-  const keyIndex = keys.indexOf(currentKey);
+  const keyIndex = keyMap.findIndex((k) => k.value === currentKey);
   keyRow.set_selected(keyIndex >= 0 ? keyIndex : 0);
 
   keyRow.connect("notify::selected", () => {
     const idx = keyRow.get_selected();
-    if (idx < keys.length) {
-      settings.set_string("magnifier-key", keys[idx]);
+    if (idx < keyMap.length) {
+      settings.set_string("magnifier-key", keyMap[idx].value);
     }
   });
 
