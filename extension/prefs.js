@@ -8,6 +8,7 @@ import { ExtensionPreferences } from "resource:///org/gnome/Shell/Extensions/js/
 
 import { buildGeneralGroup } from "./prefs/general-group.js";
 import { buildAppearanceGroup } from "./prefs/appearance-group.js";
+import { buildBorderGroup } from "./prefs/border-group.js";
 
 export default class HatiPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
@@ -21,6 +22,7 @@ export default class HatiPreferences extends ExtensionPreferences {
     // groups
     page.add(buildGeneralGroup(settings));
     page.add(buildAppearanceGroup(settings));
+    page.add(buildBorderGroup(settings));
 
     window.add(page);
   }
