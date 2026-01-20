@@ -1,6 +1,6 @@
 .PHONY: all install-extension clean package deploy-remote
 
-EXTENSION_UUID = [email protected]
+EXTENSION_UUID = hati@szymonwilczek.github.io
 EXTENSION_DIR = extension
 REMOTE_HOST = wolfie@dionisus.local
 REMOTE_EXT_DIR = .local/share/gnome-shell/extensions/$(EXTENSION_UUID)
@@ -16,7 +16,7 @@ install-extension:
 	@glib-compile-schemas ~/.local/share/gnome-shell/extensions/$(EXTENSION_UUID)/schemas/
 	@echo "✅ Extension installed. Restart GNOME Shell to apply."
 
-# remote deployment
+# remote deployment (for testing on dionisus.local)
 deploy-remote:
 	@echo "🚀 Deploying extension to $(REMOTE_HOST)..."
 	@ssh $(REMOTE_HOST) "mkdir -p '$(REMOTE_EXT_DIR)'"
