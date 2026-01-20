@@ -1,18 +1,13 @@
-// prefs/border-group.js - Border and glow settings group
+// prefs/styling-group.js - Border and glow styling
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Adw from "gi://Adw";
 import Gtk from "gi://Gtk";
 import Gio from "gi://Gio";
 
-/**
- * Build the Border preferences group
- * @param {Gio.Settings} settings - Extension settings
- * @returns {Adw.PreferencesGroup}
- */
-export function buildBorderGroup(settings) {
+export function buildStylingGroup(settings) {
   const group = new Adw.PreferencesGroup({
-    title: "Border",
+    title: "Styling",
   });
 
   // Border Weight
