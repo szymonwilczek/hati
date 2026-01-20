@@ -26,6 +26,7 @@ import { renderHighlight } from "./modules/highlight-renderer.js";
 import { initShaders } from "./shaders/shaders.js";
 import { Magnifier } from "./modules/magnifier.js";
 import { AutoHide } from "./modules/auto-hide.js";
+import Indicator from "./modules/indicator.js";
 
 export default class HatiExtension extends Extension {
   constructor(metadata) {
@@ -35,6 +36,7 @@ export default class HatiExtension extends Extension {
     this._innerRing = null;
     this._settings = null;
     this._settingsChangedId = null;
+    this._indicator = null;
   }
 
   enable() {
@@ -66,6 +68,12 @@ export default class HatiExtension extends Extension {
       },
     );
 
+    // indicator
+    this._indicator = new Indicator(this.path, this._settings, () => {
+      this.openPreferences();
+    });
+    Main.panel.addToStatusArea("hati", this._indicator);
+
     // only proceed if enabled
     if (!this._settings.get_boolean("enabled")) {
       console.log("[Hati] Disabled in settings, not creating highlight");
@@ -79,6 +87,11 @@ export default class HatiExtension extends Extension {
 
   disable() {
     console.log("[Hati] Disabling cursor highlighter...");
+
+    if (this._indicator) {
+      this._indicator.destroy();
+      this._indicator = null;
+    }
 
     this._removeHighlightActor();
 
