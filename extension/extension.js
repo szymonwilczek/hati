@@ -310,33 +310,6 @@ export default class HatiExtension extends Extension {
       curY - containerHeight / 2,
     );
 
-    // Edge Squish
-    const monitor = Main.layoutManager.primaryMonitor;
-    if (!monitor) return Clutter.TICK_CONTINUE;
-
-    const distLeft = curX - monitor.x;
-    const distRight = monitor.x + monitor.width - curX;
-    const distTop = curY - monitor.y;
-    const distBottom = monitor.y + monitor.height - curY;
-
-    const size = this._settings.get_int("size");
-    const radius = size / 2;
-    const limit = radius + 20;
-
-    let scaleX = 1.0;
-    let scaleY = 1.0;
-
-    if (distLeft < limit) scaleX = Math.max(0.4, distLeft / limit);
-    if (distRight < limit) scaleX = Math.max(0.4, distRight / limit);
-    if (distTop < limit) scaleY = Math.max(0.4, distTop / limit);
-    if (distBottom < limit) scaleY = Math.max(0.4, distBottom / limit);
-
-    scaleX = Math.pow(scaleX, 0.5);
-    scaleY = Math.pow(scaleY, 0.5);
-
-    // Scale highlight actor
-    this._highlightActor.set_scale(scaleX, scaleY);
-
     return Clutter.TICK_CONTINUE;
   }
 
