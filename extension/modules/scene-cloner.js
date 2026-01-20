@@ -151,35 +151,48 @@ export class SceneCloner {
     // clean up old clones
     this._windowClones.forEach((clone) => {
       if (clone) {
-        this._contentGroup.remove_child(clone);
-        clone.destroy();
+        try {
+          this._contentGroup.remove_child(clone);
+          clone.destroy();
+        } catch (e) {
+          // ignore cleanup errors
+        }
       }
     });
     this._windowClones = [];
 
     // get windows from active workspace
-    const workspace = global.workspace_manager.get_active_workspace();
-    const windows = workspace.list_windows();
+    let windows = [];
+    try {
+      const workspace = global.workspace_manager.get_active_workspace();
+      windows = workspace.list_windows();
+    } catch (e) {
+      console.log(`[Hati SceneCloner] Failed to get windows: ${e}`);
+      return;
+    }
 
     // sort by stacking order
-    windows.sort((a, b) => {
-      const actorA = a.get_compositor_private();
-      const actorB = b.get_compositor_private();
-      if (!actorA || !actorB) return 0;
-      return (
-        global.window_group.get_child_index(actorA) -
-        global.window_group.get_child_index(actorB)
-      );
-    });
+    try {
+      windows.sort((a, b) => {
+        const actorA = a.get_compositor_private();
+        const actorB = b.get_compositor_private();
+        if (!actorA || !actorB) return 0;
+        const indexA = global.window_group.get_child_index(actorA);
+        const indexB = global.window_group.get_child_index(actorB);
+        return indexA - indexB;
+      });
+    } catch (e) {
+      // continue with unsorted windows
+    }
 
-    // clone each visible window
+    // clone each visible window (including popups and transients)
     for (const win of windows) {
-      if (win.is_hidden() || win.minimized) continue;
-
-      const actor = win.get_compositor_private();
-      if (!actor || !actor.visible) continue;
-
       try {
+        if (win.is_hidden() || win.minimized) continue;
+
+        const actor = win.get_compositor_private();
+        if (!actor || !actor.visible) continue;
+
         const clone = new Clutter.Clone({
           source: actor,
           reactive: false,
@@ -194,7 +207,8 @@ export class SceneCloner {
 
         this._windowClones.push(clone);
       } catch (e) {
-        console.log(`[Hati SceneCloner] Failed to clone window: ${e}`);
+        // skip windows that fail to clone
+        console.log(`[Hati SceneCloner] Skipping window: ${e.message}`);
       }
     }
   }
