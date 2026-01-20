@@ -6,10 +6,10 @@ REMOTE_HOST = wolfie@dionisus.local
 REMOTE_EXT_DIR = .local/share/gnome-shell/extensions/$(EXTENSION_UUID)
 
 
-all: install-extension
+all: install
 
 # targets
-install-extension:
+install:
 	@echo "📦 Installing extension locally..."
 	@mkdir -p ~/.local/share/gnome-shell/extensions/$(EXTENSION_UUID)
 	@cp -r $(EXTENSION_DIR)/* ~/.local/share/gnome-shell/extensions/$(EXTENSION_UUID)/
@@ -25,9 +25,12 @@ deploy-remote:
 	@echo "✅ Extension deployed."
 
 # packaging for extensions.gnome.org
-package:
+pack:
 	@echo "📦 Creating extension package..."
 	@mkdir -p dist
+	@# remove old compiled schemas before packing
+	@rm -f $(EXTENSION_DIR)/schemas/gschemas.compiled
+	@glib-compile-schemas $(EXTENSION_DIR)/schemas/
 	@cd $(EXTENSION_DIR) && zip -r ../dist/$(EXTENSION_UUID).zip * -x "*.git*"
 	@echo "✅ Package created: dist/$(EXTENSION_UUID).zip"
 

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <rect id="bg" width="512" height="512" rx="128" ry="128" fill="#000000" />
+  </defs>
+  <use href="#bg" />
+  <g transform="translate(256, 256)">
+    <rect x="-150" y="-150" width="300" height="300" rx="120" ry="120" 
+          fill="none" stroke="#d579ff" stroke-width="20"
+          transform="rotate(45)" />
+    <rect x="-120" y="-120" width="240" height="240" rx="96" ry="96" 
+          fill="none" stroke="#6a3c80" stroke-width="20"
+          transform="rotate(45)" />
+  </g>
+  <g transform="translate(256, 256)">
+    <g transform="scale(6) translate(-28, -7)">
+       <path
+         d="m 26.604893,2.3179921 0,16.4402329 3.712311,-3.623922 2.12132,4.331029 c 0.519598,1.171377 3.220861,0.229524 2.452777,-1.336875 l -2.099224,-4.496756 4.684582,-4.4e-5 z"
+         fill="#000000" 
+         stroke="#ffffff" 
+         stroke-width="1.0" 
+         stroke-linejoin="round"
+         stroke-miterlimit="10"/>
+    </g>
+  </g>
+</svg>
