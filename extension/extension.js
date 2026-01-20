@@ -25,6 +25,7 @@ import { getAnimation } from "./animations/animations.js";
 import { renderHighlight } from "./modules/highlight-renderer.js";
 import { initShaders } from "./shaders/shaders.js";
 import { Magnifier } from "./modules/magnifier.js";
+import { AutoHide } from "./modules/auto-hide.js";
 
 export default class HatiExtension extends Extension {
   constructor(metadata) {
@@ -153,6 +154,13 @@ export default class HatiExtension extends Extension {
       },
     );
 
+    // Auto-hide
+    this._autoHide = new AutoHide(
+      this._settings,
+      this._highlightActor,
+      this._containerActor,
+    );
+
     // Initial Style
     this._refreshStyle();
 
@@ -230,6 +238,11 @@ export default class HatiExtension extends Extension {
     // Magnifier Update
     if (this._magnifier) {
       this._magnifier.update(curX, curY);
+    }
+
+    // Auto-hide Update
+    if (this._autoHide) {
+      this._autoHide.update(curX, curY, 16);
     }
 
     // --- Click Animation Logic ---

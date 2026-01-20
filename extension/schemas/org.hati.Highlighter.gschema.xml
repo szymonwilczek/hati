@@ -168,8 +168,8 @@
     </key>
     
     <key name="auto-hide-delay" type="i">
-      <range min="500" max="5000"/>
-      <default>2000</default>
+      <range min="1000" max="15000"/>
+      <default>3000</default>
       <summary>Auto-hide delay</summary>
       <description>Time in milliseconds before hiding stationary cursor</description>
     </key>
