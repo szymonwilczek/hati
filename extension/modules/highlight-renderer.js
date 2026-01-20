@@ -63,12 +63,15 @@ export function renderHighlight(area, params) {
   let animScaleX = 1.0;
   let animScaleY = 1.0;
   let animTranslateX = 0;
+  let glowMultiplier = 1.0;
+  let extraRingProgress = 0;
   let drawColor = {
     r: color.red / 255,
     g: color.green / 255,
     b: color.blue / 255,
     a: color.alpha,
-  }; // default
+  };
+  let clickColor = null;
 
   if (
     clickAnimations &&
@@ -91,6 +94,8 @@ export function renderHighlight(area, params) {
       targetB = drawSettings.leftClickColor.blue / 255;
     }
 
+    clickColor = { r: targetR, g: targetG, b: targetB };
+
     // current * (1-p) + target * p
     const blend = Math.min(1.0, progress * 0.8);
 
@@ -104,6 +109,8 @@ export function renderHighlight(area, params) {
     animScaleX = transforms.scaleX;
     animScaleY = transforms.scaleY;
     animTranslateX = transforms.translateX;
+    glowMultiplier = transforms.glowMultiplier || 1.0;
+    extraRingProgress = transforms.extraRingProgress || 0;
   }
 
   const centerX = width / 2;
@@ -115,7 +122,7 @@ export function renderHighlight(area, params) {
   // click animation transforms
   cr.translate(animTranslateX, 0);
   cr.scale(animScaleX, animScaleY);
-  // shape totation
+  // shape rotation
   cr.rotate(rotationRad);
 
   // helper wrapper for drawRoundedRect
@@ -141,6 +148,7 @@ export function renderHighlight(area, params) {
         drawColor,
         width,
         height,
+        glowMultiplier, // pass multiplier for glow-burst
       },
       drawRect,
     );
@@ -180,8 +188,28 @@ export function renderHighlight(area, params) {
   drawRect(innerHalf, innerRadius);
   cr.stroke();
 
-  // reset dash just in case
+  // reset dash
   cr.setDash([], 0);
+
+  // extra expanding ring for ring-expand animation
+  if (extraRingProgress > 0 && clickColor) {
+    const expandScale = 1.0 + extraRingProgress * 0.5; // expand to 150%
+    const expandOpacity = 1.0 - extraRingProgress; // fade out
+
+    cr.setSourceRGBA(
+      clickColor.r,
+      clickColor.g,
+      clickColor.b,
+      expandOpacity * 0.8,
+    );
+    cr.setLineWidth(outerBorderWidth);
+
+    const expandHalf = (outerHalf - outerBorderWidth / 2) * expandScale;
+    const expandRadius = outerRadius * expandScale;
+
+    drawRect(expandHalf, expandRadius);
+    cr.stroke();
+  }
 
   // dispose context when done
   cr.$dispose();

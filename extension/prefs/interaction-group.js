@@ -62,6 +62,9 @@ export function buildInteractionGroup(settings) {
   const modeModel = new Gtk.StringList();
   modeModel.append("Directional");
   modeModel.append("Ripple");
+  modeModel.append("Pulse");
+  modeModel.append("Glow Burst");
+  modeModel.append("Ring Expand");
 
   const modeRow = new Adw.ComboRow({
     title: "Animation Mode",
@@ -69,13 +72,16 @@ export function buildInteractionGroup(settings) {
     model: modeModel,
   });
 
+  const modes = ["directional", "ripple", "pulse", "glow-burst", "ring-expand"];
   const currentMode = settings.get_string("click-animation-mode");
-  modeRow.set_selected(currentMode === "ripple" ? 1 : 0);
+  const modeIndex = modes.indexOf(currentMode);
+  modeRow.set_selected(modeIndex >= 0 ? modeIndex : 0);
 
   modeRow.connect("notify::selected", () => {
-    const modes = ["directional", "ripple"];
     const idx = modeRow.get_selected();
-    settings.set_string("click-animation-mode", modes[idx]);
+    if (idx < modes.length) {
+      settings.set_string("click-animation-mode", modes[idx]);
+    }
   });
 
   settings.bind(

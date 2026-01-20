@@ -56,26 +56,28 @@ export class Glow {
       drawColor,
       width,
       height,
+      glowMultiplier = 1.0,
     } = params;
 
     cr.save();
-    // const glowPathHalfW = outerHalf; // outer edge of outer ring
 
     cr.rectangle(-width, -height, width * 2, height * 2); // universe
     drawRoundedRect(outerHalf - outerBorderWidth, outerRadius); // inner edge of outer ring
 
-    // draw with BLENDED color
-    cr.setSourceRGBA(
-      drawColor.r,
-      drawColor.g,
-      drawColor.b,
-      (drawColor.a * 0.5) / 10,
+    // apply glowMultiplier for glow-burst animation
+    const effectiveAlpha = Math.min(
+      1.0,
+      (drawColor.a * 0.5 * glowMultiplier) / 10,
     );
+    cr.setSourceRGBA(drawColor.r, drawColor.g, drawColor.b, effectiveAlpha);
 
     // with multiple strokes
     const steps = 10;
+    const effectiveRadius = this._radius * glowMultiplier;
+    const effectiveSpread = this._spread * glowMultiplier;
+
     for (let i = 0; i < steps; i++) {
-      const spread = this._spread + this._radius * (i / steps);
+      const spread = effectiveSpread + effectiveRadius * (i / steps);
       cr.setLineWidth(outerBorderWidth + spread);
       drawRoundedRect(outerHalf - outerBorderWidth / 2, outerRadius);
       cr.stroke();

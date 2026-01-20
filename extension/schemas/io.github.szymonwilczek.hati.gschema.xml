@@ -155,10 +155,13 @@
       <choices>
         <choice value='directional'/>
         <choice value='ripple'/>
+        <choice value='pulse'/>
+        <choice value='glow-burst'/>
+        <choice value='ring-expand'/>
       </choices>
       <default>'directional'</default>
       <summary>Click animation mode</summary>
-      <description>Style of click animation (directional or ripple)</description>
+      <description>Style of click animation</description>
     </key>
     
     <key name="auto-hide" type="b">
