@@ -72,7 +72,6 @@ export default class HatiExtension extends Extension {
     }
 
     this._createHighlightActor();
-    this._startCursorTracking();
 
     console.log("[Hati] Enabled successfully");
   }
@@ -80,7 +79,6 @@ export default class HatiExtension extends Extension {
   disable() {
     console.log("[Hati] Disabling cursor highlighter...");
 
-    this._stopCursorTracking();
     this._removeHighlightActor();
 
     // cleanup settings
@@ -328,8 +326,6 @@ export default class HatiExtension extends Extension {
 
     return Clutter.TICK_CONTINUE;
   }
-
-  _updateHighlightPosition() {}
 
   _toggleHighlight() {
     if (this._settings.get_boolean("enabled")) {
