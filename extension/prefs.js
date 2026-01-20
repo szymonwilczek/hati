@@ -11,6 +11,7 @@ import { buildAppearanceGroup } from "./prefs/appearance-group.js";
 import { buildBorderGroup } from "./prefs/border-group.js";
 import { buildMagnifierGroup } from "./prefs/magnifier-group.js";
 import { buildPhysicsGroup } from "./prefs/physics-group.js";
+import { buildBehaviorGroup } from "./prefs/behavior-group.js";
 
 export default class HatiPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
@@ -27,6 +28,7 @@ export default class HatiPreferences extends ExtensionPreferences {
     page.add(buildBorderGroup(settings));
     page.add(buildMagnifierGroup(settings));
     page.add(buildPhysicsGroup(settings));
+    page.add(buildBehaviorGroup(settings));
 
     window.add(page);
   }
