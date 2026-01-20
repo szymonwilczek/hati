@@ -144,6 +144,13 @@ export class Magnifier {
    * @param {number} mask - Current modifier mask
    */
   pollActivation(mask) {
+    if (!this._settings.get_boolean("magnifier-enabled")) {
+      if (this._active) {
+        this.deactivate();
+      }
+      return;
+    }
+
     const activationMask = this.getActivationMask();
     const isPressed = (mask & activationMask) !== 0;
 
@@ -159,6 +166,7 @@ export class Magnifier {
    */
   activate() {
     if (!this._group) return;
+    if (!this._settings.get_boolean("magnifier-enabled")) return;
 
     const isInterruptedExit = this._group.visible && this._group.opacity > 0;
     if (this._active && !isInterruptedExit) {
