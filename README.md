@@ -11,6 +11,7 @@
   </a>
 
   <br>
+  <br>
   <p>Part of the <strong>Eclipse Presentation Suite</strong></p>
   <p>Check out its brother extension: <a href="https://github.com/szymonwilczek/skoll"><strong>Skoll</strong></a></p>
 </div>
