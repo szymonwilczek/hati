@@ -70,6 +70,12 @@ cd hati
 make install
 ```
 
+#### Alternative: Shell Script (No Make required)
+If you don't have `make` installed, you can use the provided script:
+```bash
+./scripts/install.sh
+```
+
 ## Configuration
 
 Settings can be accessed via the **Extensions** app or by right-clicking the extension icon if enabled. 
