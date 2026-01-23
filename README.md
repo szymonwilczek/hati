@@ -9,6 +9,10 @@
   <a href="https://wayland.freedesktop.org">
     <img src="https://img.shields.io/badge/Platform-Wayland-orange?style=flat-square" alt="Wayland">
   </a>
+
+  <br>
+  <p>Part of the <strong>Eclipse Presentation Suite</strong></p>
+  <p>Check out its brother extension: <a href="https://github.com/szymonwilczek/skoll"><strong>Skoll</strong></a></p>
 </div>
 
 <br>
