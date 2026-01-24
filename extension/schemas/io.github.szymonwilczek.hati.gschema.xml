@@ -9,14 +9,14 @@
     </key>
     
     <key name="color" type="s">
-      <default>'rgba(99, 162, 255, 0.7)'</default>
+      <default>'rgba(144, 238, 144, 1.0)'</default>
       <summary>Highlight color</summary>
       <description>RGBA color value for the cursor highlight ring</description>
     </key>
     
     <key name="size" type="i">
       <range min="40" max="200"/>
-      <default>80</default>
+      <default>125</default>
       <summary>Highlight size</summary>
       <description>Diameter of the highlight ring in pixels</description>
     </key>
@@ -55,7 +55,7 @@
 
     <key name="rotation" type="i">
       <range min="0" max="360"/>
-      <default>0</default>
+      <default>45</default>
       <summary>Rotation angle</summary>
       <description>Angle of rotation in degrees (0-360)</description>
     </key>
@@ -68,21 +68,21 @@
 
     <key name="corner-radius" type="i">
       <range min="0" max="50"/>
-      <default>50</default>
+      <default>40</default>
       <summary>Corner Radius Percentage</summary>
       <description>0=Square, 25=Squircle, 50=Circle</description>
     </key>
 
     <key name="glow-radius" type="i">
       <range min="0" max="100"/>
-      <default>20</default>
+      <default>10</default>
       <summary>Glow Blur Radius</summary>
       <description>Blur radius of the glow in pixels</description>
     </key>
 
     <key name="glow-spread" type="i">
       <range min="0" max="50"/>
-      <default>5</default>
+      <default>4</default>
       <summary>Glow Spread Radius</summary>
       <description>Spread radius of the glow in pixels</description>
     </key>
@@ -93,12 +93,12 @@
       <description>If true, adds symmetric indentations to the shape edges.</description>
     </key>
     <key name="dashed-border" type="b">
-      <default>false</default>
+      <default>true</default>
       <summary>Enable dashed inner border</summary>
       <description>If true, the inner ring will be drawn with a dashed line style.</description>
     </key>
     <key name="dash-gap-size" type="d">
-      <default>3.0</default>
+      <default>1.5</default>
       <summary>Size of gap between dashes</summary>
       <description>Controls the density of the dashes. Smaller value = higher density.</description>
     </key>
@@ -126,12 +126,12 @@
     </key>
 
     <key name="magnifier-enabled" type="b">
-      <default>false</default>
+      <default>true</default>
       <summary>Enable magnifier</summary>
       <description>Master switch for the magnifier feature</description>
     </key>
     <key name="magnifier-zoom" type="d">
-      <default>2.0</default>
+      <default>1.5</default>
       <summary>Magnifier zoom factor</summary>
       <description>Zoom level (1.0 - 4.0)</description>
     </key>
@@ -146,7 +146,7 @@
         <choice value='Super_L'/>
         <choice value='Super_R'/>
       </choices>
-      <default>'Shift_L'</default>
+      <default>'Control_L'</default>
       <summary>Magnifier activation key</summary>
       <description>Key to hold to activate magnifier</description>
     </key>
@@ -159,13 +159,13 @@
         <choice value='glow-burst'/>
         <choice value='ring-expand'/>
       </choices>
-      <default>'directional'</default>
+      <default>'ripple'</default>
       <summary>Click animation mode</summary>
       <description>Style of click animation</description>
     </key>
     
     <key name="auto-hide" type="b">
-      <default>false</default>
+      <default>true</default>
       <summary>Auto-hide when stationary</summary>
       <description>Automatically hide the highlight when the cursor isn't moving</description>
     </key>
@@ -185,14 +185,14 @@
 
     <key name="inertia-stiffness" type="d">
       <range min="0.01" max="1.0"/>
-      <default>0.12</default>
+      <default>0.65</default>
       <summary>Inertia Stiffness</summary>
       <description>Spring stiffness (Higher = Faster/Tighter follow)</description>
     </key>
 
     <key name="inertia-smoothness" type="d">
       <range min="0.1" max="0.99"/>
-      <default>0.65</default>
+      <default>0.40</default>
       <summary>Inertia Smoothness</summary>
       <description>Velocity retention factor (Higher = More slippery/gliding, Lower = High friction)</description>
     </key>
