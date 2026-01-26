@@ -1,4 +1,3 @@
-// modules/magnifier.js - Magnifier functionality
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Clutter from "gi://Clutter";
@@ -24,16 +23,10 @@ export class Magnifier {
   constructor(settings, physics) {
     this._settings = settings;
     this._physics = physics;
-
-    // UI elements
     this._group = null;
     this._contentGroup = null;
     this._clipEffect = null;
-
-    // scene cloner (manages bg, windows, panel clones)
     this._sceneCloner = null;
-
-    // state
     this._active = false;
     this._keyPressed = false;
     this._lastLogTime = null;

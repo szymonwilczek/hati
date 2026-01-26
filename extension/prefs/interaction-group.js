@@ -1,4 +1,3 @@
-// prefs/interaction-group.js - Click interaction settings
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Adw from "gi://Adw";
@@ -45,7 +44,6 @@ export function buildInteractionGroup(settings) {
     title: "Interaction",
   });
 
-  // Click Animations Toggle
   const clickAnimationsRow = new Adw.SwitchRow({
     title: "Click Animations",
     subtitle: "Show effect when clicking",
@@ -58,7 +56,7 @@ export function buildInteractionGroup(settings) {
   );
   group.add(clickAnimationsRow);
 
-  // Animation Mode
+  // animation mode
   const modeModel = new Gtk.StringList();
   modeModel.append("Directional");
   modeModel.append("Ripple");
@@ -92,7 +90,6 @@ export function buildInteractionGroup(settings) {
   );
   group.add(modeRow);
 
-  // Left Click Color
   const leftClickRow = new Adw.ActionRow({
     title: "Left Click Color",
     subtitle: "Animation color for left button",
@@ -107,7 +104,6 @@ export function buildInteractionGroup(settings) {
   leftClickRow.add_suffix(leftColorButton);
   group.add(leftClickRow);
 
-  // Right Click Color
   const rightClickRow = new Adw.ActionRow({
     title: "Right Click Color",
     subtitle: "Animation color for right button",

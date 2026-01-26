@@ -1,4 +1,3 @@
-// shaders/shaders.js - Shader utilities
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Gio from "gi://Gio";

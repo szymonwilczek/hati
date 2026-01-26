@@ -1,9 +1,7 @@
-// modules/style-manager.js - Style and settings management
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { parseColor } from "../utils.js";
 
-// GNOME accent color mapping
 const ACCENT_COLORS = {
   blue: "rgba(53, 132, 228, 1)",
   teal: "rgba(99, 193, 190, 1)",
@@ -57,16 +55,13 @@ export function buildDrawSettings(params) {
   const cornerRadius = settings.get_int("corner-radius");
   const rotation = settings.get_int("rotation");
 
-  // glow
   const glowEnabled = glow ? glow.isEnabled() : false;
   const glowRadius = glow ? glow.getRadius() : 0;
   const glowSpread = glow ? glow.getSpread() : 0;
 
-  // click animations
   const clickAnimations = settings.get_boolean("click-animations");
   const clickAnimationMode = settings.get_string("click-animation-mode");
 
-  // shape
   const maxRadius = size / 2;
   const radiusPx = Math.round(maxRadius * (cornerRadius / 50.0));
 

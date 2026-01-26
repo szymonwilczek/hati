@@ -1,4 +1,3 @@
-// extension.js - Hati Cursor Highlighter for GNOME Shell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Clutter from "gi://Clutter";
@@ -120,8 +119,6 @@ export default class HatiExtension extends Extension {
       return; // already created!
     }
 
-    // ST.DRAWINGAREA with correct Cairo GJS API
-    // Container handles physics positioning
     this._containerActor = new St.Widget({
       style_class: "hati-container",
       reactive: false,
@@ -129,7 +126,6 @@ export default class HatiExtension extends Extension {
       layout_manager: new Clutter.BinLayout(),
     });
 
-    // Drawing area for Cairo
     this._canvas = new St.DrawingArea({
       style_class: "hati-canvas",
       reactive: false,
@@ -148,14 +144,11 @@ export default class HatiExtension extends Extension {
     this._outerRing = this._canvas;
     this._innerRing = null;
 
-    // Physics
     this._physics = new Physics(this._settings);
     this._tickId = 0;
 
-    // Glow
     this._glow = new Glow(this._settings);
 
-    // Magnifier
     this._magnifier = new Magnifier(this._settings, this._physics);
     this._magnifier.init();
 
@@ -167,20 +160,17 @@ export default class HatiExtension extends Extension {
       },
     );
 
-    // Auto-hide
     this._autoHide = new AutoHide(
       this._settings,
       this._highlightActor,
       this._containerActor,
     );
 
-    // Initial Style
     this._refreshStyle();
 
-    // Add to UI
     global.stage.add_child(this._containerActor);
 
-    // Start Physics
+    // start physics
     this._tickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
       this._tick();
       return GLib.SOURCE_CONTINUE;
@@ -222,7 +212,7 @@ export default class HatiExtension extends Extension {
     }
   }
 
-  // MAGNIFIER: Key Event Handler
+  // magnifier: key event handler
   _onStageEvent(event) {
     if (this._magnifier && this._magnifier.handleKeyEvent(event)) {
       return Clutter.EVENT_STOP;
@@ -238,25 +228,20 @@ export default class HatiExtension extends Extension {
     const containerWidth = this._containerActor.get_width();
     const containerHeight = this._containerActor.get_height();
 
-    // Activation Polling Logic
     if (this._magnifier) {
       this._magnifier.pollActivation(mask);
     }
 
-    // Physics Update
     const [curX, curY] = this._physics.update(pointerX, pointerY);
 
-    // Magnifier Update
     if (this._magnifier) {
       this._magnifier.update(curX, curY);
     }
 
-    // Auto-hide Update
     if (this._autoHide) {
       this._autoHide.update(curX, curY, 16);
     }
 
-    // --- Click Animation Logic ---
     if (!this._clickState) {
       this._clickState = {
         active: false,
@@ -374,7 +359,6 @@ export default class HatiExtension extends Extension {
     this._containerActor.set_opacity(255);
   }
 
-  // Cairo drawing callback for St.DrawingArea - DUAL RING VERSION
   _drawHighlight(area) {
     renderHighlight(area, {
       drawSettings: this._drawSettings,

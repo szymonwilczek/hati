@@ -1,4 +1,3 @@
-// prefs/styling-group.js - Border and glow styling
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Adw from "gi://Adw";
@@ -10,7 +9,6 @@ export function buildStylingGroup(settings) {
     title: "Styling",
   });
 
-  // Border Weight
   const borderWeightRow = new Adw.SpinRow({
     title: "Border Weight",
     subtitle: "Ring thickness",
@@ -30,7 +28,6 @@ export function buildStylingGroup(settings) {
   );
   group.add(borderWeightRow);
 
-  // Gap
   const gapRow = new Adw.SpinRow({
     title: "Ring Gap",
     subtitle: "Space between rings",
@@ -46,7 +43,6 @@ export function buildStylingGroup(settings) {
   settings.bind("gap", gapRow, "value", Gio.SettingsBindFlags.DEFAULT);
   group.add(gapRow);
 
-  // Dashed Border Toggle
   const dashedBorderRow = new Adw.SwitchRow({
     title: "Dashed Inner Border",
     subtitle: "Make the inner ring dashed",
@@ -59,7 +55,6 @@ export function buildStylingGroup(settings) {
   );
   group.add(dashedBorderRow);
 
-  // Dash Gap Size
   const dashGapRow = new Adw.SpinRow({
     title: "Dash Density",
     subtitle: "Gap between ticks (lower = denser)",
@@ -86,7 +81,6 @@ export function buildStylingGroup(settings) {
   );
   group.add(dashGapRow);
 
-  // Glow Toggle
   const glowRow = new Adw.SwitchRow({
     title: "Glow Effect",
     subtitle: "Add soft outer glow",
@@ -94,7 +88,6 @@ export function buildStylingGroup(settings) {
   settings.bind("glow", glowRow, "active", Gio.SettingsBindFlags.DEFAULT);
   group.add(glowRow);
 
-  // Glow Radius
   const glowRadiusRow = new Adw.SpinRow({
     title: "Glow Radius",
     subtitle: "Blur amount",
@@ -120,7 +113,6 @@ export function buildStylingGroup(settings) {
   );
   group.add(glowRadiusRow);
 
-  // Glow Spread
   const glowSpreadRow = new Adw.SpinRow({
     title: "Glow Spread",
     subtitle: "Spread amount",

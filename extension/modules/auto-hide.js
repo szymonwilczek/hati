@@ -1,4 +1,3 @@
-// modules/auto-hide.js - Auto-hide functionality
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Clutter from "gi://Clutter";

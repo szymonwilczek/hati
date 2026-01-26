@@ -1,4 +1,3 @@
-// prefs/colors-group.js - Color settings
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Adw from "gi://Adw";
@@ -45,7 +44,6 @@ export function buildColorsGroup(settings) {
     title: "Colors",
   });
 
-  // System Accent Toggle
   const systemAccentRow = new Adw.SwitchRow({
     title: "Use System Accent Color",
     subtitle: "Sync with desktop accent (GNOME 46+)",
@@ -58,7 +56,6 @@ export function buildColorsGroup(settings) {
   );
   group.add(systemAccentRow);
 
-  // Custom Color
   const colorRow = new Adw.ActionRow({
     title: "Custom Color",
     subtitle: "Highlight color (if accent disabled)",
@@ -73,7 +70,6 @@ export function buildColorsGroup(settings) {
   colorRow.add_suffix(colorButton);
   group.add(colorRow);
 
-  // Opacity
   const opacityRow = new Adw.SpinRow({
     title: "Opacity",
     subtitle: "Transparency level",

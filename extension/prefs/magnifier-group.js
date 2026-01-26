@@ -1,4 +1,3 @@
-// prefs/magnifier-group.js - Magnifier settings group
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Adw from "gi://Adw";
@@ -15,7 +14,6 @@ export function buildMagnifierGroup(settings) {
     title: "Magnifier",
   });
 
-  // Enable Toggle
   const enableRow = new Adw.SwitchRow({
     title: "Enable Magnifier",
     subtitle: "Hold key to magnify area under cursor",
@@ -28,7 +26,6 @@ export function buildMagnifierGroup(settings) {
   );
   group.add(enableRow);
 
-  // Zoom Factor
   const zoomRow = new Adw.SpinRow({
     title: "Zoom Factor",
     subtitle: "Magnification level (1.0 - 4.0)",
@@ -55,7 +52,6 @@ export function buildMagnifierGroup(settings) {
   );
   group.add(zoomRow);
 
-  // Activation Key
   const keyModel = new Gtk.StringList();
   const keyMap = [
     { name: "Left Shift", value: "Shift_L" },
@@ -76,7 +72,7 @@ export function buildMagnifierGroup(settings) {
     model: keyModel,
   });
 
-  // Set current key
+  // set current key
   const currentKey = settings.get_string("magnifier-key");
   const keyIndex = keyMap.findIndex((k) => k.value === currentKey);
   keyRow.set_selected(keyIndex >= 0 ? keyIndex : 0);

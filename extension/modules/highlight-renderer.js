@@ -1,4 +1,3 @@
-// modules/highlight-renderer.js - Cairo highlight drawing logic
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { getAnimation } from "../animations/animations.js";
@@ -148,7 +147,7 @@ export function renderHighlight(area, params) {
         drawColor,
         width,
         height,
-        glowMultiplier, // pass multiplier for glow-burst
+        glowMultiplier,
       },
       drawRect,
     );

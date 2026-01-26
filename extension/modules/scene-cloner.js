@@ -1,4 +1,3 @@
-// modules/scene-cloner.js - Scene cloning for magnifier
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Clutter from "gi://Clutter";
@@ -100,8 +99,6 @@ export class SceneCloner {
       );
     });
   }
-
-  // --- PRIVATE METHODS ---
 
   _createBackgroundClone() {
     if (this._bgClone) return;

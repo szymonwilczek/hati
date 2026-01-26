@@ -1,4 +1,3 @@
-// prefs/physics-group.js - Physics settings group
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Adw from "gi://Adw";
@@ -15,7 +14,6 @@ export function buildPhysicsGroup(settings) {
     title: "Physics",
   });
 
-  // Inertia Toggle
   const inertiaRow = new Adw.SwitchRow({
     title: "Enable Physics",
     subtitle: "Use inertia and spring dynamics",
@@ -28,7 +26,6 @@ export function buildPhysicsGroup(settings) {
   );
   group.add(inertiaRow);
 
-  // Stiffness
   const stiffnessRow = new Adw.SpinRow({
     title: "Stiffness (Speed)",
     subtitle: "How fast the cursor catches up",
@@ -55,7 +52,6 @@ export function buildPhysicsGroup(settings) {
   );
   group.add(stiffnessRow);
 
-  // Smoothness
   const smoothnessRow = new Adw.SpinRow({
     title: "Smoothness (Friction)",
     subtitle: "Higher = more slippery, Lower = more friction",

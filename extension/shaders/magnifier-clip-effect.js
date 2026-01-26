@@ -1,4 +1,3 @@
-// shaders/magnifier-clip-effect.js - Magnifier rounded corners clipping effect
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Cogl from "gi://Cogl";

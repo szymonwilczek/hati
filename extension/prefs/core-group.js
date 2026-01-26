@@ -1,4 +1,3 @@
-// prefs/core-group.js - Core settings (Enable, Shape, Size, etc.)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Adw from "gi://Adw";
@@ -10,7 +9,6 @@ export function buildCoreGroup(settings) {
     title: "Core",
   });
 
-  // Enable toggle
   const enableRow = new Adw.SwitchRow({
     title: "Enable Hati",
     subtitle: "Show cursor highlight",
@@ -18,7 +16,6 @@ export function buildCoreGroup(settings) {
   settings.bind("enabled", enableRow, "active", Gio.SettingsBindFlags.DEFAULT);
   group.add(enableRow);
 
-  // Shape selector
   const shapeModel = new Gtk.StringList();
   shapeModel.append("Circle");
   shapeModel.append("Squircle");
@@ -43,7 +40,6 @@ export function buildCoreGroup(settings) {
   });
   group.add(shapeRow);
 
-  // Size
   const sizeRow = new Adw.SpinRow({
     title: "Size",
     subtitle: "Highlight diameter",
@@ -58,7 +54,6 @@ export function buildCoreGroup(settings) {
   settings.bind("size", sizeRow, "value", Gio.SettingsBindFlags.DEFAULT);
   group.add(sizeRow);
 
-  // Corner radius
   const cornerRadiusRow = new Adw.SpinRow({
     title: "Corner Radius (%)",
     subtitle: "0 = Square, 50 = Circle",
@@ -78,7 +73,6 @@ export function buildCoreGroup(settings) {
   );
   group.add(cornerRadiusRow);
 
-  // Rotation
   const rotationRow = new Adw.SpinRow({
     title: "Rotation",
     subtitle: "Angle in degrees",

@@ -1,4 +1,3 @@
-// prefs/idle-group.js - Idle/Auto-hide settings
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Adw from "gi://Adw";
@@ -10,7 +9,6 @@ export function buildIdleGroup(settings) {
     title: "Idle",
   });
 
-  // Auto-hide Toggle
   const autoHideRow = new Adw.SwitchRow({
     title: "Auto-hide",
     subtitle: "Hide when cursor is stationary",
@@ -23,7 +21,6 @@ export function buildIdleGroup(settings) {
   );
   group.add(autoHideRow);
 
-  // Auto-hide Delay
   const delayRow = new Adw.SpinRow({
     title: "Hide Delay",
     subtitle: "Seconds before hiding (1-15)",

@@ -1,21 +1,15 @@
-// modules/physics.js - Inertia physics logic
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 export class Physics {
   constructor(settings) {
     this._settings = settings;
-
-    // State
     this._currentX = 0;
     this._currentY = 0;
     this._velocityX = 0;
     this._velocityY = 0;
-
-    // Constants
     this._k = 0.12;
     this._d = 0.65;
     this._inertiaEnabled = true;
-
     this.updateConstants();
   }
 

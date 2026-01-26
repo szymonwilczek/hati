@@ -1,4 +1,3 @@
-// modules/glow.js - Glow effect logic
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 export class Glow {
