@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import St from "gi://St";
 import Gio from "gi://Gio";
-import GObject from "gi://GObject"; // Import GObject
+import GObject from "gi://GObject";
 import Clutter from "gi://Clutter";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
@@ -35,7 +37,6 @@ const Indicator = GObject.registerClass(
     }
 
     _buildMenu() {
-      // Enable Switch
       this._enableSwitch = new PopupMenu.PopupSwitchMenuItem(
         _("Enable Hati"),
         this._settings.get_boolean("enabled"),
@@ -54,10 +55,8 @@ const Indicator = GObject.registerClass(
         },
       );
 
-      // Separator
       this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-      // Settings Button
       this._settingsItem = new PopupMenu.PopupMenuItem(_("Settings"));
       this._settingsItem.connect("activate", () => {
         if (this._openSettingsCallback) {
