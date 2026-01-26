@@ -23,6 +23,10 @@ It provides a highly customizable visual ring around your cursor, essential for:
 - **Live Demonstrations**
 - **Accessibility**
 
+## Preview
+
+https://github.com/user-attachments/assets/778d996f-08ca-45d9-92bc-cc9d4ac6312a
+
 ## Features
 
 | Category | Description |
