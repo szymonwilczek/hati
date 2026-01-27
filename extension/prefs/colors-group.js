@@ -61,14 +61,53 @@ export function buildColorsGroup(settings) {
     subtitle: "Highlight color (if accent disabled)",
   });
   const colorButton = createColorButton(settings, "color");
-  settings.bind(
-    "use-system-accent",
-    colorButton,
-    "sensitive",
-    Gio.SettingsBindFlags.INVERT_BOOLEAN,
-  );
   colorRow.add_suffix(colorButton);
   group.add(colorRow);
+
+  const rgbRow = new Adw.SwitchRow({
+    title: "RGB Mode (Rainbow)",
+    subtitle: "Cycle through colors continuously",
+  });
+  settings.bind("rgb-enabled", rgbRow, "active", Gio.SettingsBindFlags.DEFAULT);
+  group.add(rgbRow);
+
+  const rgbSpeedRow = new Adw.SpinRow({
+    title: "RGB Speed",
+    subtitle: "Speed of color cycling",
+    digits: 1,
+    adjustment: new Gtk.Adjustment({
+      lower: 0.1,
+      upper: 10.0,
+      step_increment: 0.1,
+      page_increment: 1.0,
+      value: settings.get_double("rgb-speed"),
+    }),
+  });
+  settings.bind(
+    "rgb-speed",
+    rgbSpeedRow,
+    "value",
+    Gio.SettingsBindFlags.DEFAULT,
+  );
+  settings.bind(
+    "rgb-enabled",
+    rgbSpeedRow,
+    "sensitive",
+    Gio.SettingsBindFlags.DEFAULT,
+  );
+  group.add(rgbSpeedRow);
+
+  const updateSensitivity = () => {
+    const rgbEnabled = settings.get_boolean("rgb-enabled");
+    const useSystemAccent = settings.get_boolean("use-system-accent");
+
+    systemAccentRow.sensitive = !rgbEnabled;
+    colorButton.sensitive = !rgbEnabled && !useSystemAccent;
+  };
+
+  settings.connect("changed::rgb-enabled", updateSensitivity);
+  settings.connect("changed::use-system-accent", updateSensitivity);
+  updateSensitivity();
 
   const opacityRow = new Adw.SpinRow({
     title: "Opacity",

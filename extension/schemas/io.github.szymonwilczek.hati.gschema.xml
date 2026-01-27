@@ -13,6 +13,19 @@
       <summary>Highlight color</summary>
       <description>RGBA color value for the cursor highlight ring</description>
     </key>
+
+    <key name="rgb-enabled" type="b">
+      <default>false</default>
+      <summary>Enable RGB mode</summary>
+      <description>Cycle through colors continuously</description>
+    </key>
+
+    <key name="rgb-speed" type="d">
+      <range min="0.1" max="10.0"/>
+      <default>2.0</default>
+      <summary>RGB cycle speed</summary>
+      <description>Speed of color cycling</description>
+    </key>
     
     <key name="size" type="i">
       <range min="40" max="200"/>

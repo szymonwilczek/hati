@@ -13,7 +13,7 @@ import Cairo from "gi://cairo";
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
-import { parseColor } from "./utils.js";
+import { parseColor, hslToRgb } from "./utils.js";
 import {
   buildDrawSettings,
   calculateCanvasSize,
@@ -78,6 +78,9 @@ export default class HatiExtension extends Extension {
       console.log("[Hati] Disabled in settings, not creating highlight");
       return;
     }
+
+    this._rgbEnabled = this._settings.get_boolean("rgb-enabled");
+    this._rgbSpeed = this._settings.get_double("rgb-speed");
 
     this._createHighlightActor();
 
@@ -306,6 +309,20 @@ export default class HatiExtension extends Extension {
       curY - containerHeight / 2,
     );
 
+    if (this._rgbEnabled && this._drawSettings && this._drawSettings.color) {
+      const now = GLib.get_monotonic_time() / 1000; // ms
+      const speed = this._rgbSpeed || 2.0;
+      const hue = (now * speed * 0.1) % 360;
+      const rgb = hslToRgb(hue, 1.0, 0.5);
+
+      this._drawSettings.color.red = rgb.red;
+      this._drawSettings.color.green = rgb.green;
+      this._drawSettings.color.blue = rgb.blue;
+      this._drawSettings.color.alpha = 1.0;
+
+      this._canvas.queue_repaint();
+    }
+
     return Clutter.TICK_CONTINUE;
   }
 
@@ -336,6 +353,13 @@ export default class HatiExtension extends Extension {
       if (this._glow) {
         this._glow.updateConstants();
       }
+    }
+
+    if (key === "rgb-enabled") {
+      this._rgbEnabled = this._settings.get_boolean("rgb-enabled");
+    }
+    if (key === "rgb-speed") {
+      this._rgbSpeed = this._settings.get_double("rgb-speed");
     }
 
     this._refreshStyle();
