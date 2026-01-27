@@ -12,6 +12,7 @@ import { buildInteractionGroup } from "./prefs/interaction-group.js";
 import { buildIdleGroup } from "./prefs/idle-group.js";
 import { buildMagnifierGroup } from "./prefs/magnifier-group.js";
 import { buildSpotlightGroup } from "./prefs/spotlight-group.js";
+import { PresetsPage } from "./prefs/presets-page.js";
 
 export default class HatiPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
@@ -42,5 +43,8 @@ export default class HatiPreferences extends ExtensionPreferences {
     });
     magnifierPage.add(buildMagnifierGroup(settings));
     window.add(magnifierPage);
+
+    const presetsPage = new PresetsPage(settings);
+    window.add(presetsPage);
   }
 }
