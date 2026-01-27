@@ -6,7 +6,7 @@ import Gio from "gi://Gio";
 
 export function buildSpotlightGroup(settings) {
   const group = new Adw.PreferencesGroup({
-    title: "Spotlight (Reflektor)",
+    title: "Spotlight",
   });
 
   const enabledRow = new Adw.SwitchRow({
