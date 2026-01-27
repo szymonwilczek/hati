@@ -55,6 +55,11 @@ export function initShaders(extensionPath) {
     code: loadShader(extensionPath, "magnifier-clip.frag"),
   };
 
+  _loadedShaders["spotlight"] = {
+    declarations: loadShader(extensionPath, "spotlight.glsl"),
+    code: loadShader(extensionPath, "spotlight.frag"),
+  };
+
   console.log("[Hati Shaders] All shaders initialized");
 }
 

@@ -26,6 +26,7 @@ import { initShaders } from "./shaders/shaders.js";
 import { Magnifier } from "./modules/magnifier.js";
 import { AutoHide } from "./modules/auto-hide.js";
 import Indicator from "./modules/indicator.js";
+import { Spotlight } from "./modules/spotlight.js";
 
 export default class HatiExtension extends Extension {
   constructor(metadata) {
@@ -75,7 +76,6 @@ export default class HatiExtension extends Extension {
 
     // only proceed if enabled
     if (!this._settings.get_boolean("enabled")) {
-      console.log("[Hati] Disabled in settings, not creating highlight");
       return;
     }
 
@@ -169,6 +169,8 @@ export default class HatiExtension extends Extension {
       this._containerActor,
     );
 
+    this._spotlight = new Spotlight(this._settings);
+
     this._refreshStyle();
 
     global.stage.add_child(this._containerActor);
@@ -178,8 +180,6 @@ export default class HatiExtension extends Extension {
       this._tick();
       return GLib.SOURCE_CONTINUE;
     });
-
-    console.log("[Hati] Highlight actor created (Modular Magnifier)");
   }
 
   _updatePhysicsConstants() {
@@ -212,6 +212,11 @@ export default class HatiExtension extends Extension {
 
       this._outerRing = null;
       this._innerRing = null;
+
+      if (this._spotlight) {
+        this._spotlight.destroy();
+        this._spotlight = null;
+      }
     }
   }
 
@@ -243,6 +248,11 @@ export default class HatiExtension extends Extension {
 
     if (this._autoHide) {
       this._autoHide.update(curX, curY, 16);
+    }
+
+    if (this._spotlight) {
+      this._spotlight.pollActivation(mask);
+      this._spotlight.update(curX, curY);
     }
 
     if (!this._clickState) {

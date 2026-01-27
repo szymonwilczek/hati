@@ -6,10 +6,6 @@ import Shell from "gi://Shell";
 
 import { getShaderDeclarations, getShaderCode } from "./shaders.js";
 
-/**
- * MagnifierClipEffect - GLSL effect for rounded corners clipping
- * Used by the magnifier to clip content to rounded rectangle
- */
 export const MagnifierClipEffect = GObject.registerClass(
   {},
   class MagnifierClipEffect extends Shell.GLSLEffect {
@@ -18,7 +14,6 @@ export const MagnifierClipEffect = GObject.registerClass(
       this._boundsLoc = this.get_uniform_location("bounds");
       this._clipRadiusLoc = this.get_uniform_location("clipRadius");
       this._pixelStepLoc = this.get_uniform_location("pixelStep");
-      console.log("[Hati] MagnifierClipEffect initialized");
     }
 
     vfunc_build_pipeline() {
@@ -38,10 +33,6 @@ export const MagnifierClipEffect = GObject.registerClass(
       this.set_uniform_float(this._clipRadiusLoc, 1, [cornerRadius]);
       this.set_uniform_float(this._pixelStepLoc, 2, pixelStep);
       this.queue_repaint();
-
-      console.log(
-        `[Hati ClipEffect] Updated: ${width}x${height}, radius=${cornerRadius}`,
-      );
     }
   },
 );

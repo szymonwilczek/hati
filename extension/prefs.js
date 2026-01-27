@@ -11,6 +11,7 @@ import { buildPhysicsGroup } from "./prefs/physics-group.js";
 import { buildInteractionGroup } from "./prefs/interaction-group.js";
 import { buildIdleGroup } from "./prefs/idle-group.js";
 import { buildMagnifierGroup } from "./prefs/magnifier-group.js";
+import { buildSpotlightGroup } from "./prefs/spotlight-group.js";
 
 export default class HatiPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
@@ -31,6 +32,7 @@ export default class HatiPreferences extends ExtensionPreferences {
     });
     behaviorPage.add(buildPhysicsGroup(settings));
     behaviorPage.add(buildInteractionGroup(settings));
+    behaviorPage.add(buildSpotlightGroup(settings));
     behaviorPage.add(buildIdleGroup(settings));
     window.add(behaviorPage);
 
