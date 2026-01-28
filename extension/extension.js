@@ -246,8 +246,13 @@ export default class HatiExtension extends Extension {
       this._magnifier.update(curX, curY);
     }
 
+    // detect button state from mask
+    const leftPressed = (mask & Clutter.ModifierType.BUTTON1_MASK) !== 0;
+    const rightPressed = (mask & Clutter.ModifierType.BUTTON3_MASK) !== 0;
+    const anyPressed = leftPressed || rightPressed;
+
     if (this._autoHide) {
-      this._autoHide.update(curX, curY, 16);
+      this._autoHide.update(curX, curY, anyPressed, 16);
     }
 
     if (this._spotlight) {
@@ -265,10 +270,6 @@ export default class HatiExtension extends Extension {
     }
 
     // detect button state from mask
-    const leftPressed = (mask & Clutter.ModifierType.BUTTON1_MASK) !== 0;
-    const rightPressed = (mask & Clutter.ModifierType.BUTTON3_MASK) !== 0;
-
-    const anyPressed = leftPressed || rightPressed;
     const pressedButton = leftPressed ? "left" : rightPressed ? "right" : null;
 
     // react to state changes

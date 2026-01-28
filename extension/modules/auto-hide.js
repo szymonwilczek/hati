@@ -29,9 +29,10 @@ export class AutoHide {
    * Update auto-hide state (called every tick)
    * @param {number} curX - Current cursor X
    * @param {number} curY - Current cursor Y
+   * @param {boolean} isClicking - Current clicking state
    * @param {number} deltaMs - Time since last tick in ms
    */
-  update(curX, curY, deltaMs = 16) {
+  update(curX, curY, isClicking, deltaMs = 16) {
     // always track position, even when hidden (smoother UX :) )
     const threshold = 2; // pixels of movement to consider as 'moving'
     const dx = Math.abs(curX - this._lastX);
@@ -53,7 +54,7 @@ export class AutoHide {
       return;
     }
 
-    if (moved) {
+    if (moved || isClicking) {
       this._stationaryTime = 0;
       if (this._hidden) {
         this._show();
