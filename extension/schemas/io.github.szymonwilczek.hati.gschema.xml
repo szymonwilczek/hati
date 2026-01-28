@@ -241,7 +241,7 @@
 
     <key name="spotlight-size" type="i">
       <range min="50" max="500"/>
-      <default>150</default>
+      <default>130</default>
       <summary>Spotlight hole size</summary>
       <description>Diameter of the spotlight circle</description>
     </key>
