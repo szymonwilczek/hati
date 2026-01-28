@@ -112,6 +112,24 @@ export class PresetsManager {
     return success;
   }
 
+  saveExternalPreset(name, config) {
+    if (!config || typeof config !== "object") {
+      console.error("[Hati Presets] Invalid config object");
+      return false;
+    }
+
+    const keys = Object.keys(config);
+
+    if (keys.length === 0) {
+      console.warn("[Hati Presets] Warning: Imported configuration is empty.");
+    }
+
+    const presets = this.getPresets();
+    presets[name] = config;
+
+    return this._writePresets(presets);
+  }
+
   applyPreset(name) {
     console.log(`[Hati Presets] Applying preset: ${name}`);
 
@@ -125,30 +143,44 @@ export class PresetsManager {
       return false;
     }
 
+    const presetKeys = Object.keys(preset);
+    console.log(
+      `[Hati Presets] Preset data found. Keys in preset: ${presetKeys.join(", ")}`,
+    );
+
     this._keys.forEach((key) => {
       if (Object.prototype.hasOwnProperty.call(preset, key)) {
         const val = preset[key];
-        const type = typeof val;
+        action = "SET";
+        const defaultVal = this._settings.get_value(key);
+        const schemaType = defaultVal.get_type_string();
 
         try {
-          if (type === "boolean") {
-            this._settings.set_boolean(key, val);
-          } else if (type === "string") {
-            this._settings.set_string(key, val);
-          } else if (type === "number") {
-            const currentVal = this._settings.get_value(key);
-            const currentType = currentVal.get_type_string();
-            if (currentType === "i") {
-              this._settings.set_int(key, Math.round(val));
-            } else if (currentType === "d") {
-              this._settings.set_double(key, val);
-            }
+          if (schemaType === "b") {
+            this._settings.set_boolean(key, Boolean(val));
+          } else if (schemaType === "s") {
+            this._settings.set_string(key, String(val));
+          } else if (schemaType === "i") {
+            let intVal = parseInt(val, 10);
+            if (isNaN(intVal)) throw new Error(`Invalid integer: ${val}`);
+            this._settings.set_int(key, intVal);
+          } else if (schemaType === "d") {
+            let doubleVal = parseFloat(val);
+            if (isNaN(doubleVal)) throw new Error(`Invalid double: ${val}`);
+            this._settings.set_double(key, doubleVal);
+          } else {
+            console.warn(
+              `[Hati Presets] Unsupported schema type: ${schemaType} for key ${key}`,
+            );
           }
+          appliedValue = val;
         } catch (e) {
           console.error(`[Hati Presets] Failed to set ${key}: ${e.message}`);
+          action = "ERROR";
         }
       } else {
         this._settings.reset(key);
+        action = "RESET";
       }
     });
 

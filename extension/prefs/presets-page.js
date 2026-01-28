@@ -27,7 +27,7 @@ export const PresetsPage = GObject.registerClass(
     _buildUI() {
       const createGroup = new Adw.PreferencesGroup({
         title: "Create Preset",
-        description: "Save current configuration as a new preset",
+        description: "Save current configuration or import from file",
       });
       this.add(createGroup);
 
@@ -48,7 +48,81 @@ export const PresetsPage = GObject.registerClass(
 
       createGroup.add(entryRow);
 
+      const importRow = new Adw.ActionRow({
+        title: "Import from File",
+        subtitle: "Load a preset from a JSON file",
+        activatable: true,
+      });
+      importRow.connect("activated", () => {
+        this._importPreset();
+      });
+      importRow.add_suffix(
+        new Gtk.Image({
+          icon_name: "document-open-symbolic",
+        }),
+      );
+      createGroup.add(importRow);
+
       this._refreshList();
+    }
+
+    _importPreset() {
+      const dialog = new Gtk.FileChooserNative({
+        title: "Import Preset",
+        action: Gtk.FileChooserAction.OPEN,
+        accept_label: "Import",
+        cancel_label: "Cancel",
+        modal: true,
+      });
+
+      const filter = new Gtk.FileFilter();
+      filter.set_name("JSON Files");
+      filter.add_pattern("*.json");
+      dialog.add_filter(filter);
+
+      dialog.connect("response", (d, response_id) => {
+        if (response_id === Gtk.ResponseType.ACCEPT) {
+          const file = dialog.get_file();
+
+          try {
+            const [success, contents] = file.load_contents(null);
+
+            if (success) {
+              const jsonString = new TextDecoder().decode(contents);
+              const config = JSON.parse(jsonString);
+
+              let name = file.get_basename();
+              if (name.toLowerCase().endsWith(".json")) {
+                name = name.slice(0, -5);
+              }
+
+              name = name.replace(/_/g, " ");
+
+              if (this._manager.saveExternalPreset(name, config)) {
+                this._refreshList();
+                const toast = new Adw.Toast({
+                  title: `Preset '${name}' imported`,
+                });
+                const root = this.get_root();
+                if (root && root.add_toast) root.add_toast(toast);
+              } else {
+                const toast = new Adw.Toast({ title: "Failed to save preset" });
+                const root = this.get_root();
+                if (root && root.add_toast) root.add_toast(toast);
+              }
+            }
+          } catch (e) {
+            const toast = new Adw.Toast({
+              title: "Import failed: Invalid file",
+            });
+            const root = this.get_root();
+            if (root && root.add_toast) root.add_toast(toast);
+          }
+        }
+        dialog.destroy();
+      });
+
+      dialog.show();
     }
 
     _refreshList() {
@@ -101,7 +175,11 @@ export const PresetsPage = GObject.registerClass(
       applyBtn.add_css_class("flat");
       applyBtn.add_css_class("suggested-action");
       applyBtn.connect("clicked", () => {
-        this._manager.applyPreset(name);
+        if (this._manager.applyPreset(name)) {
+          const toast = new Adw.Toast({ title: `${name} applied` });
+          const root = this.get_root();
+          if (root && root.add_toast) root.add_toast(toast);
+        }
       });
       row.add_suffix(applyBtn);
 
