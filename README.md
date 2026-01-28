@@ -34,8 +34,8 @@ https://github.com/user-attachments/assets/778d996f-08ca-45d9-92bc-cc9d4ac6312a
 | **Performance** | **Memory:** ~2-3MB. **Render Time:** ~4.7ms/frame. **Zero Copy** tracking. |
 | **Visuals** | Dual-ring design (Solid/Dashed), Corner Radius (Squircle/Circle), dynamic Glow effects. |
 | **Interaction** | Visual feedback for clicks: **Pulse**, **Ripple**, **Glow Burst**. Distinct Left/Right click colors. |
-| **Utilities** | Built-in GPU magnifier. Press `Ctrl` (by default, it's customizable) to instantly zoom into the UI. |
-| **Config** | Changes apply instantly. No shell restarts required. Native GTK4 preferences window. |
+| **Utilities** | **Spotlight Mode** (dim screen except cursor), **GPU Magnifier** (instant zoom). Customizable shortcuts. |
+| **Config** | Changes apply instantly. **Shareable Presets** (Import/Export JSON). Native GTK4 preferences window. |
 
 ## Installation
 
@@ -81,7 +81,8 @@ Settings can be accessed via the **Extensions** app or by right-clicking the ext
 
 - **Appearance:** Shape (Circle/Square), Size, Colors, Opacity, Border Weight.
 - **Behavior:** Auto-hide timeout, Inertia physics sliders.
-- **Magnifier:** Zoom level, Activation keys.
+- **Utilities:** Spotlight configuration, Magnifier zoom level & keys.
+- **Presets:** Built-in collections, **Import/Export** functionality to share configs.
 
 ## Contributing
 
