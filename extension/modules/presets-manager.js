@@ -125,8 +125,8 @@ export class PresetsManager {
       return false;
     }
 
-    Object.keys(preset).forEach((key) => {
-      if (this._keys.includes(key)) {
+    this._keys.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(preset, key)) {
         const val = preset[key];
         const type = typeof val;
 
@@ -147,6 +147,8 @@ export class PresetsManager {
         } catch (e) {
           console.error(`[Hati Presets] Failed to set ${key}: ${e.message}`);
         }
+      } else {
+        this._settings.reset(key);
       }
     });
 
