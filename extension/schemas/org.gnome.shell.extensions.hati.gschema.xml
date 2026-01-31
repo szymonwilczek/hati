@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="io.github.szymonwilczek.hati" path="/io/github/szymonwilczek/hati/">
+  <schema id="org.gnome.shell.extensions.hati" path="/org/gnome/shell/extensions/hati/">
     
     <key name="enabled" type="b">
       <default>false</default>

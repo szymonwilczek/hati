@@ -8,5 +8,8 @@
   ],
   "version": 2,
   "url": "https://github.com/szymonwilczek/hati",
-  "settings-schema": "io.github.szymonwilczek.hati"
+  "settings-schema": "org.gnome.shell.extensions.hati",
+  "donations": {
+    "github": "szymonwilczek"
+  }
 }

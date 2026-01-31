@@ -6,35 +6,47 @@ let _shaderCache = {};
 let _loadedShaders = {};
 
 /**
- * Load a shader file from the shaders directory
+ * Load a shader file from the shaders directory asynchronously
  * @param {string} extensionPath - Path to the extension
  * @param {string} filename - Shader filename
- * @returns {string} - Shader content or empty string on failure
+ * @returns {Promise<string>} - Shader content or empty string on failure
  */
-export function loadShader(extensionPath, filename) {
-  const cacheKey = `${extensionPath}/${filename}`;
+function loadShaderAsync(extensionPath, filename) {
+  return new Promise((resolve) => {
+    const cacheKey = `${extensionPath}/${filename}`;
 
-  // return cached if available
-  if (_shaderCache[cacheKey]) {
-    return _shaderCache[cacheKey];
-  }
-
-  try {
-    const file = Gio.File.new_for_path(`${extensionPath}/shaders/${filename}`);
-    const [success, contents] = file.load_contents(null);
-
-    if (success) {
-      const content = new TextDecoder().decode(contents);
-      _shaderCache[cacheKey] = content;
-      return content;
+    // return cached if available
+    if (_shaderCache[cacheKey]) {
+      resolve(_shaderCache[cacheKey]);
+      return;
     }
 
-    console.error(`[Hati Shaders] Failed to load: ${filename}`);
-    return "";
-  } catch (e) {
-    console.error(`[Hati Shaders] Error loading ${filename}: ${e}`);
-    return "";
-  }
+    try {
+      const file = Gio.File.new_for_path(
+        `${extensionPath}/shaders/${filename}`,
+      );
+      file.load_contents_async(null, (file, result) => {
+        try {
+          const [success, contents] = file.load_contents_finish(result);
+
+          if (success) {
+            const content = new TextDecoder().decode(contents);
+            _shaderCache[cacheKey] = content;
+            resolve(content);
+          } else {
+            console.error(`[Hati Shaders] Failed to load: ${filename}`);
+            resolve("");
+          }
+        } catch (e) {
+          console.error(`[Hati Shaders] Error loading ${filename}: ${e}`);
+          resolve("");
+        }
+      });
+    } catch (e) {
+      console.error(`[Hati Shaders] Error loading ${filename}: ${e}`);
+      resolve("");
+    }
+  });
 }
 
 /**
@@ -48,16 +60,25 @@ export function clearShaderCache() {
 /**
  * Initialize shaders - must be called before creating effects
  * @param {string} extensionPath - Path to the extension
+ * @returns {Promise<void>}
  */
-export function initShaders(extensionPath) {
+export async function initShaders(extensionPath) {
+  const [magnifierDecl, magnifierCode, spotlightDecl, spotlightCode] =
+    await Promise.all([
+      loadShaderAsync(extensionPath, "magnifier-clip.glsl"),
+      loadShaderAsync(extensionPath, "magnifier-clip.frag"),
+      loadShaderAsync(extensionPath, "spotlight.glsl"),
+      loadShaderAsync(extensionPath, "spotlight.frag"),
+    ]);
+
   _loadedShaders["magnifier-clip"] = {
-    declarations: loadShader(extensionPath, "magnifier-clip.glsl"),
-    code: loadShader(extensionPath, "magnifier-clip.frag"),
+    declarations: magnifierDecl,
+    code: magnifierCode,
   };
 
   _loadedShaders["spotlight"] = {
-    declarations: loadShader(extensionPath, "spotlight.glsl"),
-    code: loadShader(extensionPath, "spotlight.frag"),
+    declarations: spotlightDecl,
+    code: spotlightCode,
   };
 
   console.log("[Hati Shaders] All shaders initialized");

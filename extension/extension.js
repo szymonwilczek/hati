@@ -39,13 +39,12 @@ export default class HatiExtension extends Extension {
     this._indicator = null;
   }
 
-  enable() {
+  async enable() {
     console.log("[Hati] Enabling cursor highlighter...");
 
-    // from external files
-    initShaders(this.path);
+    await initShaders(this.path);
 
-    this._settings = this.getSettings("io.github.szymonwilczek.hati");
+    this._settings = this.getSettings();
     this._interfaceSettings = new Gio.Settings({
       schema_id: "org.gnome.desktop.interface",
     });
@@ -210,13 +209,29 @@ export default class HatiExtension extends Extension {
         this._magnifier = null;
       }
 
-      this._outerRing = null;
-      this._innerRing = null;
-
       if (this._spotlight) {
         this._spotlight.destroy();
         this._spotlight = null;
       }
+
+      if (this._autoHide) {
+        this._autoHide = null;
+      }
+
+      if (this._glow) {
+        this._glow = null;
+      }
+
+      if (this._physics) {
+        this._physics = null;
+      }
+
+      this._canvas = null;
+      this._highlightActor = null;
+      this._outerRing = null;
+      this._innerRing = null;
+      this._clickState = null;
+      this._drawSettings = null;
     }
   }
 

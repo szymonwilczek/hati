@@ -16,7 +16,7 @@ import { PresetsPage } from "./prefs/presets-page.js";
 
 export default class HatiPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
-    const settings = this.getSettings("io.github.szymonwilczek.hati");
+    const settings = this.getSettings();
 
     const appearancePage = new Adw.PreferencesPage({
       title: "Appearance",

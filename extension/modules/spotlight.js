@@ -22,44 +22,60 @@ export class Spotlight {
     this._x = 0;
     this._y = 0;
 
-    this._settings.connect("changed::spotlight-enabled", () => {
-      this._enabled = this._settings.get_boolean("spotlight-enabled");
-      if (!this._enabled) this.deactivate();
-    });
-    this._settings.connect("changed::spotlight-key", () => {
-      this._key = this._settings.get_string("spotlight-key");
-    });
-    this._settings.connect("changed::spotlight-opacity", () => {
-      this._opacity = this._settings.get_double("spotlight-opacity");
-      if (this._active && this._effect) {
-        this._updateUniforms();
-      }
-    });
-    this._settings.connect("changed::spotlight-size", () => {
-      this._size = this._settings.get_int("spotlight-size");
-      if (this._active && this._effect) {
-        this._updateUniforms();
-      }
-    });
+    this._signalIds = [];
 
-    this._settings.connect("changed::shape", () => {
-      this._shape = getShapeValue(this._settings.get_string("shape"));
-      if (this._active && this._effect) {
-        this._updateUniforms();
-      }
-    });
-    this._settings.connect("changed::rotation", () => {
-      this._rotation = this._settings.get_int("rotation");
-      if (this._active && this._effect) {
-        this._updateUniforms();
-      }
-    });
-    this._settings.connect("changed::corner-radius", () => {
-      this._cornerRadius = this._settings.get_int("corner-radius");
-      if (this._active && this._effect) {
-        this._updateUniforms();
-      }
-    });
+    this._signalIds.push(
+      this._settings.connect("changed::spotlight-enabled", () => {
+        this._enabled = this._settings.get_boolean("spotlight-enabled");
+        if (!this._enabled) this.deactivate();
+      }),
+    );
+    this._signalIds.push(
+      this._settings.connect("changed::spotlight-key", () => {
+        this._key = this._settings.get_string("spotlight-key");
+      }),
+    );
+    this._signalIds.push(
+      this._settings.connect("changed::spotlight-opacity", () => {
+        this._opacity = this._settings.get_double("spotlight-opacity");
+        if (this._active && this._effect) {
+          this._updateUniforms();
+        }
+      }),
+    );
+    this._signalIds.push(
+      this._settings.connect("changed::spotlight-size", () => {
+        this._size = this._settings.get_int("spotlight-size");
+        if (this._active && this._effect) {
+          this._updateUniforms();
+        }
+      }),
+    );
+
+    this._signalIds.push(
+      this._settings.connect("changed::shape", () => {
+        this._shape = getShapeValue(this._settings.get_string("shape"));
+        if (this._active && this._effect) {
+          this._updateUniforms();
+        }
+      }),
+    );
+    this._signalIds.push(
+      this._settings.connect("changed::rotation", () => {
+        this._rotation = this._settings.get_int("rotation");
+        if (this._active && this._effect) {
+          this._updateUniforms();
+        }
+      }),
+    );
+    this._signalIds.push(
+      this._settings.connect("changed::corner-radius", () => {
+        this._cornerRadius = this._settings.get_int("corner-radius");
+        if (this._active && this._effect) {
+          this._updateUniforms();
+        }
+      }),
+    );
   }
 
   update(x, y) {
@@ -170,10 +186,18 @@ export class Spotlight {
   }
 
   destroy() {
+    if (this._signalIds && this._settings) {
+      for (const id of this._signalIds) {
+        this._settings.disconnect(id);
+      }
+      this._signalIds = null;
+    }
+
     if (this._actor) {
       this._actor.destroy();
       this._actor = null;
     }
     this._effect = null;
+    this._settings = null;
   }
 }
