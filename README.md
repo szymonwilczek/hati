@@ -39,8 +39,9 @@ https://github.com/user-attachments/assets/778d996f-08ca-45d9-92bc-cc9d4ac6312a
 
 ## Installation
 
-### Method 1: GNOME Extensions Website (coming soon)
-*Coming soon to extensions.gnome.org, waiting for approval*
+### Method 1: GNOME Extensions Website
+
+Install via GNOME Extensions: [Hati Cursor Highlighter](https://extensions.gnome.org/extension/9209/hati-cursor-highlighter/).
 
 ### Method 2: Manual Installation
 1. Download the latest release from [Releases](https://github.com/szymonwilczek/hati/releases).
