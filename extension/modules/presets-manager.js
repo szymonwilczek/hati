@@ -64,18 +64,32 @@ export class PresetsManager {
     }
   }
 
-  getUserPresets() {
+  async getUserPresets() {
     try {
       const file = Gio.File.new_for_path(this._presetsFile);
-      if (!file.query_exists(null)) {
+      const exists = file.query_exists(null);
+      if (!exists) {
         return {};
       }
 
-      const [success, contents] = file.load_contents(null);
-      if (!success) return {};
-
-      const jsonString = new TextDecoder().decode(contents);
-      return JSON.parse(jsonString);
+      return new Promise((resolve) => {
+        file.load_contents_async(null, (source, result) => {
+          try {
+            const [success, contents] = source.load_contents_finish(result);
+            if (!success) {
+              resolve({});
+              return;
+            }
+            const jsonString = new TextDecoder().decode(contents);
+            resolve(JSON.parse(jsonString));
+          } catch (e) {
+            console.error(
+              `[Hati Presets] Failed to load user presets: ${e.message}`,
+            );
+            resolve({});
+          }
+        });
+      });
     } catch (e) {
       console.error(`[Hati Presets] Failed to load user presets: ${e.message}`);
       return {};
@@ -86,11 +100,11 @@ export class PresetsManager {
     return this._getDefaultPresets();
   }
 
-  getPresets() {
-    return this.getUserPresets();
+  async getPresets() {
+    return await this.getUserPresets();
   }
 
-  savePreset(name) {
+  async savePreset(name) {
     console.log(`[Hati Presets] Saving preset: ${name}`);
     const currentConfig = {};
 
@@ -104,15 +118,15 @@ export class PresetsManager {
       else if (type === "d") currentConfig[key] = value.get_double();
     });
 
-    const presets = this.getPresets();
+    const presets = await this.getPresets();
     presets[name] = currentConfig;
 
-    const success = this._writePresets(presets);
+    const success = await this._writePresets(presets);
     console.log(`[Hati Presets] Save result: ${success}`);
     return success;
   }
 
-  saveExternalPreset(name, config) {
+  async saveExternalPreset(name, config) {
     if (!config || typeof config !== "object") {
       console.error("[Hati Presets] Invalid config object");
       return false;
@@ -124,16 +138,16 @@ export class PresetsManager {
       console.warn("[Hati Presets] Warning: Imported configuration is empty.");
     }
 
-    const presets = this.getPresets();
+    const presets = await this.getPresets();
     presets[name] = config;
 
-    return this._writePresets(presets);
+    return await this._writePresets(presets);
   }
 
-  applyPreset(name) {
+  async applyPreset(name) {
     console.log(`[Hati Presets] Applying preset: ${name}`);
 
-    let preset = this.getUserPresets()[name];
+    let preset = (await this.getUserPresets())[name];
     if (!preset) {
       preset = this.getBuiltInPresets()[name];
     }
@@ -151,7 +165,6 @@ export class PresetsManager {
     this._keys.forEach((key) => {
       if (Object.prototype.hasOwnProperty.call(preset, key)) {
         const val = preset[key];
-        action = "SET";
         const defaultVal = this._settings.get_value(key);
         const schemaType = defaultVal.get_type_string();
 
@@ -173,44 +186,55 @@ export class PresetsManager {
               `[Hati Presets] Unsupported schema type: ${schemaType} for key ${key}`,
             );
           }
-          appliedValue = val;
         } catch (e) {
           console.error(`[Hati Presets] Failed to set ${key}: ${e.message}`);
-          action = "ERROR";
         }
       } else {
         this._settings.reset(key);
-        action = "RESET";
       }
     });
 
     return true;
   }
 
-  deletePreset(name) {
+  async deletePreset(name) {
     console.log(`[Hati Presets] Deleting preset: ${name}`);
-    const presets = this.getPresets();
+    const presets = await this.getPresets();
     if (presets[name]) {
       delete presets[name];
-      return this._writePresets(presets);
+      return await this._writePresets(presets);
     }
     return false;
   }
 
-  _writePresets(presets) {
+  async _writePresets(presets) {
     try {
       this._ensureConfigDir();
 
       const file = Gio.File.new_for_path(this._presetsFile);
       const jsonString = JSON.stringify(presets, null, 2);
-      const [success, tag] = file.replace_contents(
-        jsonString,
-        null,
-        false,
-        Gio.FileCreateFlags.NONE,
-        null,
-      );
-      return success;
+      const contents = new TextEncoder().encode(jsonString);
+
+      return new Promise((resolve) => {
+        file.replace_contents_async(
+          contents,
+          null,
+          false,
+          Gio.FileCreateFlags.NONE,
+          null,
+          (source, result) => {
+            try {
+              const [success, tag] = source.replace_contents_finish(result);
+              resolve(success);
+            } catch (e) {
+              console.error(
+                `[Hati Presets] Failed to write presets: ${e.message}`,
+              );
+              resolve(false);
+            }
+          },
+        );
+      });
     } catch (e) {
       console.error(`[Hati Presets] Failed to write presets: ${e.message}`);
       return false;

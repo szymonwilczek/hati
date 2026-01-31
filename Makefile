@@ -31,7 +31,7 @@ pack:
 	@# remove old compiled schemas before packing
 	@rm -f $(EXTENSION_DIR)/schemas/gschemas.compiled
 	@glib-compile-schemas $(EXTENSION_DIR)/schemas/
-	@cd $(EXTENSION_DIR) && zip -r ../dist/$(EXTENSION_UUID).zip * -x "*.git*"
+	@cd $(EXTENSION_DIR) && zip -r ../dist/$(EXTENSION_UUID).zip * -x "*.git*" -x "schemas/gschemas.compiled"
 	@echo "✅ Package created: dist/$(EXTENSION_UUID).zip"
 
 # cleanup

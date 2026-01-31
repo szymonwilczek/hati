@@ -36,10 +36,10 @@ export const PresetsPage = GObject.registerClass(
         show_apply_button: true,
       });
 
-      entryRow.connect("apply", () => {
+      entryRow.connect("apply", async () => {
         const name = entryRow.get_text();
         if (name && name.length > 0) {
-          if (this._manager.savePreset(name)) {
+          if (await this._manager.savePreset(name)) {
             entryRow.set_text("");
             this._refreshList();
           }
@@ -80,43 +80,61 @@ export const PresetsPage = GObject.registerClass(
       filter.add_pattern("*.json");
       dialog.add_filter(filter);
 
-      dialog.connect("response", (d, response_id) => {
+      dialog.connect("response", async (d, response_id) => {
         if (response_id === Gtk.ResponseType.ACCEPT) {
           const file = dialog.get_file();
 
           try {
-            const [success, contents] = file.load_contents(null);
+            file.load_contents_async(null, async (source, result) => {
+              try {
+                const [success, contents] = source.load_contents_finish(result);
 
-            if (success) {
-              const jsonString = new TextDecoder().decode(contents);
-              const config = JSON.parse(jsonString);
+                if (success && contents) {
+                  const jsonString = new TextDecoder().decode(contents);
+                  const config = JSON.parse(jsonString);
 
-              let name = file.get_basename();
-              if (name.toLowerCase().endsWith(".json")) {
-                name = name.slice(0, -5);
-              }
+                  let name = file.get_basename();
+                  if (name.toLowerCase().endsWith(".json")) {
+                    name = name.slice(0, -5);
+                  }
 
-              name = name.replace(/_/g, " ");
+                  name = name.replace(/_/g, " ");
 
-              if (this._manager.saveExternalPreset(name, config)) {
-                this._refreshList();
+                  if (await this._manager.saveExternalPreset(name, config)) {
+                    this._refreshList();
+                    const toast = new Adw.Toast({
+                      title: `Preset '${name}' imported`,
+                    });
+                    const root = this.get_root();
+                    if (root && root.add_toast) root.add_toast(toast);
+                  } else {
+                    const toast = new Adw.Toast({
+                      title: "Failed to save preset",
+                    });
+                    const root = this.get_root();
+                    if (root && root.add_toast) root.add_toast(toast);
+                  }
+                } else {
+                  console.error(
+                    "[Hati] Import failed: load_contents_finish returned success=false or empty contents",
+                  );
+                  const toast = new Adw.Toast({
+                    title: "Import failed: Empty or unreadable file",
+                  });
+                  const root = this.get_root();
+                  if (root && root.add_toast) root.add_toast(toast);
+                }
+              } catch (e) {
+                console.error(`[Hati] Import failed with error: ${e}`);
                 const toast = new Adw.Toast({
-                  title: `Preset '${name}' imported`,
+                  title: "Import failed: Invalid file",
                 });
                 const root = this.get_root();
                 if (root && root.add_toast) root.add_toast(toast);
-              } else {
-                const toast = new Adw.Toast({ title: "Failed to save preset" });
-                const root = this.get_root();
-                if (root && root.add_toast) root.add_toast(toast);
               }
-            }
-          } catch (e) {
-            const toast = new Adw.Toast({
-              title: "Import failed: Invalid file",
             });
-            const root = this.get_root();
-            if (root && root.add_toast) root.add_toast(toast);
+          } catch (e) {
+            console.error(e);
           }
         }
         dialog.destroy();
@@ -125,7 +143,7 @@ export const PresetsPage = GObject.registerClass(
       dialog.show();
     }
 
-    _refreshList() {
+    async _refreshList() {
       if (this._builtInGroup) this.remove(this._builtInGroup);
       if (this._userPresetsGroup) this.remove(this._userPresetsGroup);
 
@@ -146,7 +164,7 @@ export const PresetsPage = GObject.registerClass(
       });
       this.add(this._userPresetsGroup);
 
-      const userPresets = this._manager.getUserPresets();
+      const userPresets = await this._manager.getUserPresets();
       const userNames = Object.keys(userPresets).sort();
 
       if (userNames.length === 0) {
@@ -174,8 +192,8 @@ export const PresetsPage = GObject.registerClass(
       });
       applyBtn.add_css_class("flat");
       applyBtn.add_css_class("suggested-action");
-      applyBtn.connect("clicked", () => {
-        if (this._manager.applyPreset(name)) {
+      applyBtn.connect("clicked", async () => {
+        if (await this._manager.applyPreset(name)) {
           const toast = new Adw.Toast({ title: `${name} applied` });
           const root = this.get_root();
           if (root && root.add_toast) root.add_toast(toast);
@@ -202,8 +220,8 @@ export const PresetsPage = GObject.registerClass(
         });
         deleteBtn.add_css_class("flat");
         deleteBtn.add_css_class("error");
-        deleteBtn.connect("clicked", () => {
-          this._manager.deletePreset(name);
+        deleteBtn.connect("clicked", async () => {
+          await this._manager.deletePreset(name);
           this._refreshList();
         });
         row.add_suffix(deleteBtn);
@@ -225,24 +243,31 @@ export const PresetsPage = GObject.registerClass(
         `${name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.json`,
       );
 
-      dialog.connect("response", (d, response_id) => {
+      dialog.connect("response", async (d, response_id) => {
         if (response_id === Gtk.ResponseType.ACCEPT) {
           const file = dialog.get_file();
           const path = file.get_path();
 
           // get config
-          let preset = this._manager.getUserPresets()[name];
+          let preset = (await this._manager.getUserPresets())[name];
           if (!preset) preset = this._manager.getBuiltInPresets()[name];
 
           if (preset && path) {
             try {
               const jsonString = JSON.stringify(preset, null, 2);
-              file.replace_contents(
+              file.replace_contents_async(
                 jsonString,
                 null,
                 false,
                 Gio.FileCreateFlags.NONE,
                 null,
+                (source, result) => {
+                  try {
+                    source.replace_contents_finish(result);
+                  } catch (e) {
+                    console.error(`Failed to export: ${e}`);
+                  }
+                },
               );
             } catch (e) {
               console.error(`Failed to export: ${e}`);
