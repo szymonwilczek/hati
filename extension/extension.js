@@ -244,7 +244,7 @@ export default class HatiExtension extends Extension {
   }
 
   _tick() {
-    if (!this._containerActor || !this._highlightActor)
+    if (!this._containerActor || !this._highlightActor || !this._physics)
       return Clutter.TICK_STOP;
 
     const [pointerX, pointerY, mask] = global.get_pointer();
@@ -257,6 +257,8 @@ export default class HatiExtension extends Extension {
 
     const [curX, curY] = this._physics.update(pointerX, pointerY);
 
+    // re-check magnifier: _removeHighlightActor() may have torn it down
+    // (e.g. via a settings change) while physics was updating above
     if (this._magnifier) {
       this._magnifier.update(curX, curY);
     }
