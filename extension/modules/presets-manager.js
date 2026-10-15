@@ -2,6 +2,7 @@
 
 import Gio from "gi://Gio";
 import GLib from "gi://GLib";
+import { debugLog } from "../debug.js";
 
 export class PresetsManager {
   constructor(settings, schema) {
@@ -105,7 +106,7 @@ export class PresetsManager {
   }
 
   async savePreset(name) {
-    console.log(`[Hati Presets] Saving preset: ${name}`);
+    debugLog(`[Hati Presets] Saving preset: ${name}`);
     const currentConfig = {};
 
     this._keys.forEach((key) => {
@@ -122,7 +123,7 @@ export class PresetsManager {
     presets[name] = currentConfig;
 
     const success = await this._writePresets(presets);
-    console.log(`[Hati Presets] Save result: ${success}`);
+    debugLog(`[Hati Presets] Save result: ${success}`);
     return success;
   }
 
@@ -145,7 +146,7 @@ export class PresetsManager {
   }
 
   async applyPreset(name) {
-    console.log(`[Hati Presets] Applying preset: ${name}`);
+    debugLog(`[Hati Presets] Applying preset: ${name}`);
 
     let preset = (await this.getUserPresets())[name];
     if (!preset) {
@@ -158,7 +159,7 @@ export class PresetsManager {
     }
 
     const presetKeys = Object.keys(preset);
-    console.log(
+    debugLog(
       `[Hati Presets] Preset data found. Keys in preset: ${presetKeys.join(", ")}`,
     );
 
@@ -198,7 +199,7 @@ export class PresetsManager {
   }
 
   async deletePreset(name) {
-    console.log(`[Hati Presets] Deleting preset: ${name}`);
+    debugLog(`[Hati Presets] Deleting preset: ${name}`);
     const presets = await this.getPresets();
     if (presets[name]) {
       delete presets[name];
