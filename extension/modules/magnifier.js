@@ -298,30 +298,41 @@ export class Magnifier {
       this._lastLogTime = Date.now();
     }
 
-    // update sizes
-    this._group.set_size(magnifierDiameter, magnifierDiameter);
+    // shape only changes with the settings, updating the clip uniforms
+    // queues a repaint, so skip it while it stays the same
+    const shapeKey = `${magnifierDiameter}:${magnifierRadius}:${rotation}`;
+    if (shapeKey !== this._shapeKey || this._clipEffect !== this._shapeEffect) {
+      this._shapeKey = shapeKey;
+      this._shapeEffect = this._clipEffect;
 
-    if (this._clipEffect) {
-      this._clipEffect.updateUniforms(
-        magnifierDiameter,
-        magnifierDiameter,
-        magnifierRadius,
+      // update sizes
+      this._group.set_size(magnifierDiameter, magnifierDiameter);
+
+      if (this._clipEffect) {
+        this._clipEffect.updateUniforms(
+          magnifierDiameter,
+          magnifierDiameter,
+          magnifierRadius,
+        );
+      }
+
+      // rotation
+      this._group.set_pivot_point(0.5, 0.5);
+      this._group.set_rotation_angle(Clutter.RotateAxis.Z_AXIS, rotation);
+
+      this._contentGroup.set_size(magnifierDiameter, magnifierDiameter);
+      this._contentGroup.set_pivot_point(0.5, 0.5);
+      this._contentGroup.set_rotation_angle(
+        Clutter.RotateAxis.Z_AXIS,
+        -rotation,
       );
     }
 
-    // rotation
-    this._group.set_pivot_point(0.5, 0.5);
-    this._group.set_rotation_angle(Clutter.RotateAxis.Z_AXIS, rotation);
-
-    this._contentGroup.set_size(magnifierDiameter, magnifierDiameter);
-    this._contentGroup.set_pivot_point(0.5, 0.5);
-    this._contentGroup.set_rotation_angle(Clutter.RotateAxis.Z_AXIS, -rotation);
-
     // position
-    this._group.set_position(
-      curX - magnifierDiameter / 2,
-      curY - magnifierDiameter / 2,
-    );
+    const x = Math.fround(curX - magnifierDiameter / 2);
+    const y = Math.fround(curY - magnifierDiameter / 2);
+    if (this._group.x !== x || this._group.y !== y)
+      this._group.set_position(x, y);
 
     // update scene clones
     if (this._sceneCloner) {

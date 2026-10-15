@@ -92,6 +92,7 @@ export class Spotlight {
 
   update(x, y) {
     if (!this._enabled) return;
+    if (x === this._x && y === this._y) return;
 
     this._x = x;
     this._y = y;
