@@ -191,7 +191,7 @@ export const PresetsPage = GObject.registerClass(
         tooltip_text: "Apply Preset",
       });
       applyBtn.add_css_class("flat");
-      applyBtn.add_css_class("suggested-action");
+      applyBtn.add_css_class("accent");
       applyBtn.connect("clicked", async () => {
         if (await this._manager.applyPreset(name)) {
           const toast = new Adw.Toast({ title: `${name} applied` });
