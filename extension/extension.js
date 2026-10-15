@@ -170,6 +170,12 @@ export default class HatiExtension extends Extension {
 
     global.stage.add_child(this._containerActor);
 
+    // keep unredirect off for as long as the actor exists
+    global.compositor.disable_unredirect();
+    this._containerActor.connect("destroy", () =>
+      global.compositor.enable_unredirect(),
+    );
+
     // start physics
     this._tickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
       this._tick();
