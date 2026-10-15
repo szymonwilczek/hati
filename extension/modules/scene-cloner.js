@@ -122,42 +122,37 @@ export class SceneCloner {
   _createBackgroundClone() {
     if (this._bgClone) return;
 
-    // try bgManagers first
+    // clone the whole background group: it holds the wallpaper of every
+    // monitor at that monitor's position, and keeps doing so when the
+    // wallpaper changes and its actors are replaced
     try {
-      const bgManagers = Main.layoutManager._bgManagers;
-      if (bgManagers && bgManagers.length > 0) {
-        const bgManager = bgManagers[0];
-        if (bgManager && bgManager.backgroundActor) {
-          this._bgClone = new Clutter.Clone({
-            source: bgManager.backgroundActor,
-            reactive: false,
-          });
-          this._bgClone._sourceActor = { x: 0, y: 0 };
-          this._contentGroup.insert_child_at_index(this._bgClone, 0);
-          return;
-        }
-      }
-    } catch (e) {
-      debugLog(`[Hati SceneCloner] bgManagers failed: ${e}`);
-    }
-
-    // fallback to backgroundGroup
-    try {
-      const bgGroup = Main.layoutManager.backgroundGroup;
-      if (bgGroup && bgGroup.get_n_children() > 0) {
-        const bgActor = bgGroup.get_child_at_index(0);
-        if (bgActor) {
-          this._bgClone = new Clutter.Clone({
-            source: bgActor,
-            reactive: false,
-          });
-          this._bgClone._sourceActor = { x: 0, y: 0 };
-          this._contentGroup.insert_child_at_index(this._bgClone, 0);
-          return;
-        }
+      const bgGroup = Main.layoutManager._backgroundGroup;
+      if (bgGroup) {
+        this._bgClone = new Clutter.Clone({
+          source: bgGroup,
+          reactive: false,
+        });
+        this._bgClone._sourceActor = { x: 0, y: 0 };
+        this._contentGroup.insert_child_at_index(this._bgClone, 0);
+        return;
       }
     } catch (e) {
       debugLog(`[Hati SceneCloner] backgroundGroup failed: ${e}`);
+    }
+
+    // fallback to the first monitor's background
+    try {
+      const bgActor = Main.layoutManager._bgManagers?.[0]?.backgroundActor;
+      if (bgActor) {
+        this._bgClone = new Clutter.Clone({
+          source: bgActor,
+          reactive: false,
+        });
+        this._bgClone._sourceActor = { x: 0, y: 0 };
+        this._contentGroup.insert_child_at_index(this._bgClone, 0);
+      }
+    } catch (e) {
+      debugLog(`[Hati SceneCloner] bgManagers failed: ${e}`);
     }
   }
 
