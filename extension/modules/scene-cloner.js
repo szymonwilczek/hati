@@ -33,8 +33,10 @@ export class SceneCloner {
     this._createPanelClone();
 
     // rebuild on the next frame after a restack instead of waiting for
-    // the periodic rebuild, so a raised window shows up immediately
-    this._restackedId = global.display.connect("restacked", () => {
+    // the periodic rebuild, so a raised window shows up immediately.
+    // init() runs again when the magnifier is re-activated during its
+    // closing animation, so only connect once
+    this._restackedId ??= global.display.connect("restacked", () => {
       this._needsRebuild = true;
     });
   }
