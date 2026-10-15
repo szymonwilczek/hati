@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Szymon Wilczek
+
 uniform vec4 bounds;
 uniform float clipRadius;
 uniform vec2 pixelStep;

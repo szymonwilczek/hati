@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Szymon Wilczek
 
 import Adw from "gi://Adw";
 import Gtk from "gi://Gtk";

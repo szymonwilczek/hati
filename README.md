@@ -97,4 +97,6 @@ HATI_DEBUG=1 dbus-run-session gnome-shell --devkit
 
 ## License
 
-[GPL-3.0](LICENSE)
+Copyright (C) 2026 Szymon Wilczek
+
+Hati is free software, licensed under the [GNU General Public License v3.0 or later](LICENSE). Forks and redistributed copies must keep the copyright and license notices in each file.
