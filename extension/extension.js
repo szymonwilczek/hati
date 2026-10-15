@@ -243,9 +243,7 @@ export default class HatiExtension extends Extension {
 
   // magnifier: key event handler
   _onStageEvent(event) {
-    if (this._magnifier && this._magnifier.handleKeyEvent(event)) {
-      return Clutter.EVENT_STOP;
-    }
+    if (this._magnifier) this._magnifier.handleKeyEvent(event);
     return Clutter.EVENT_PROPAGATE;
   }
 
