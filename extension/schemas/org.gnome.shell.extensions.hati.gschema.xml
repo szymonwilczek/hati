@@ -7,6 +7,12 @@
       <summary>Enable Hati cursor highlighter</summary>
       <description>Master toggle for cursor highlighting</description>
     </key>
+
+    <key name="show-indicator" type="b">
+      <default>true</default>
+      <summary>Show panel indicator</summary>
+      <description>Show the Hati icon in the top bar</description>
+    </key>
     
     <key name="color" type="s">
       <default>'rgba(144, 238, 144, 1.0)'</default>

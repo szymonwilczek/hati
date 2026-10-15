@@ -67,11 +67,7 @@ export default class HatiExtension extends Extension {
       },
     );
 
-    // indicator
-    this._indicator = new Indicator(this.path, this._settings, () => {
-      this.openPreferences();
-    });
-    Main.panel.addToStatusArea("hati", this._indicator);
+    this._syncIndicator();
 
     // only proceed if enabled
     if (!this._settings.get_boolean("enabled")) {
@@ -360,7 +356,26 @@ export default class HatiExtension extends Extension {
     }
   }
 
+  _syncIndicator() {
+    const show = this._settings.get_boolean("show-indicator");
+
+    if (show && !this._indicator) {
+      this._indicator = new Indicator(this.path, this._settings, () => {
+        this.openPreferences();
+      });
+      Main.panel.addToStatusArea("hati", this._indicator);
+    } else if (!show && this._indicator) {
+      this._indicator.destroy();
+      this._indicator = null;
+    }
+  }
+
   _onSettingsChanged(key) {
+    if (key === "show-indicator") {
+      this._syncIndicator();
+      return;
+    }
+
     if (key === "enabled") {
       this._toggleHighlight();
       return;
