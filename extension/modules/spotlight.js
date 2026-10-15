@@ -118,8 +118,8 @@ export class Spotlight {
       Control_R: Clutter.ModifierType.CONTROL_MASK,
       Alt_L: Clutter.ModifierType.MOD1_MASK,
       Alt_R: Clutter.ModifierType.MOD1_MASK,
-      Super_L: Clutter.ModifierType.MOD4_MASK,
-      Super_R: Clutter.ModifierType.MOD4_MASK,
+      Super_L: Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.SUPER_MASK,
+      Super_R: Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.SUPER_MASK,
     };
 
     const targetMask = keyMap[this._key];
@@ -159,6 +159,11 @@ export class Spotlight {
 
     global.stage.add_child(this._actor);
     global.stage.set_child_above_sibling(this._actor, null);
+
+    // re-enabled when the actor is gone, which also covers the fade-out
+    // outliving deactivate()
+    global.compositor.disable_unredirect();
+    this._actor.connect("destroy", () => global.compositor.enable_unredirect());
 
     this._actor.ease({
       opacity: 255,

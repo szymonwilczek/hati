@@ -29,6 +29,7 @@ export class Magnifier {
     this._sceneCloner = null;
     this._active = false;
     this._keyPressed = false;
+    this._unredirectDisabled = false;
     this._lastLogTime = null;
   }
 
@@ -51,9 +52,7 @@ export class Magnifier {
     });
     this._group.add_child(this._contentGroup);
 
-    Main.layoutManager.addChrome(this._group, {
-      trackFullscreen: true,
-    });
+    Main.layoutManager.addChrome(this._group);
   }
 
   /**
@@ -61,6 +60,7 @@ export class Magnifier {
    */
   destroy() {
     this._cleanupResources();
+    this._setUnredirect(true);
 
     if (this._group) {
       Main.layoutManager.removeChrome(this._group);
@@ -93,7 +93,10 @@ export class Magnifier {
     if (key.includes("Shift")) return Clutter.ModifierType.SHIFT_MASK;
     if (key.includes("Control")) return Clutter.ModifierType.CONTROL_MASK;
     if (key.includes("Alt")) return Clutter.ModifierType.MOD1_MASK;
-    if (key.includes("Super")) return Clutter.ModifierType.SUPER_MASK;
+    if (key.includes("Super"))
+      return (
+        Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.SUPER_MASK
+      );
     return Clutter.ModifierType.SHIFT_MASK;
   }
 
@@ -195,6 +198,9 @@ export class Magnifier {
       this._group.add_effect(this._clipEffect);
     }
 
+    // keep unredirect off while it is on screen
+    this._setUnredirect(false);
+
     // show with animation
     this._group.visible = true;
     this._group.ease({
@@ -226,6 +232,7 @@ export class Magnifier {
         if (!this._active) {
           this._group.visible = false;
           this._cleanupResources();
+          this._setUnredirect(true);
         }
       },
     });
@@ -289,6 +296,18 @@ export class Magnifier {
     if (this._sceneCloner) {
       this._sceneCloner.update(curX, curY, zoom, magnifierDiameter);
     }
+  }
+
+  /**
+   * Toggle fullscreen unredirection, keeping disable/enable calls balanced
+   * @param {boolean} enabled - Whether unredirect should be allowed
+   */
+  _setUnredirect(enabled) {
+    if (enabled === !this._unredirectDisabled) return;
+
+    if (enabled) global.compositor.enable_unredirect();
+    else global.compositor.disable_unredirect();
+    this._unredirectDisabled = !enabled;
   }
 
   _cleanupResources() {
