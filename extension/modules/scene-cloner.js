@@ -2,6 +2,7 @@
 
 import Clutter from "gi://Clutter";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import { debugLog } from "../debug.js";
 
 /**
  * Manages cloning of desktop scene elements (background, windows, panel)
@@ -134,7 +135,7 @@ export class SceneCloner {
         }
       }
     } catch (e) {
-      console.log(`[Hati SceneCloner] bgManagers failed: ${e}`);
+      debugLog(`[Hati SceneCloner] bgManagers failed: ${e}`);
     }
 
     // fallback to backgroundGroup
@@ -153,7 +154,7 @@ export class SceneCloner {
         }
       }
     } catch (e) {
-      console.log(`[Hati SceneCloner] backgroundGroup failed: ${e}`);
+      debugLog(`[Hati SceneCloner] backgroundGroup failed: ${e}`);
     }
   }
 
@@ -179,7 +180,7 @@ export class SceneCloner {
       actors = global.get_window_actors();
       workspace = global.workspace_manager.get_active_workspace();
     } catch (e) {
-      console.log(`[Hati SceneCloner] Failed to get windows: ${e}`);
+      debugLog(`[Hati SceneCloner] Failed to get windows: ${e}`);
       return;
     }
 
@@ -206,7 +207,7 @@ export class SceneCloner {
         this._windowClones.push(clone);
       } catch (e) {
         // skip windows that fail to clone
-        console.log(`[Hati SceneCloner] Skipping window: ${e.message}`);
+        debugLog(`[Hati SceneCloner] Skipping window: ${e.message}`);
       }
     }
   }

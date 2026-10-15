@@ -27,6 +27,7 @@ import { Magnifier } from "./modules/magnifier.js";
 import { AutoHide } from "./modules/auto-hide.js";
 import Indicator from "./modules/indicator.js";
 import { Spotlight } from "./modules/spotlight.js";
+import { debugLog } from "./debug.js";
 
 export default class HatiExtension extends Extension {
   constructor(metadata) {
@@ -40,7 +41,7 @@ export default class HatiExtension extends Extension {
   }
 
   async enable() {
-    console.log("[Hati] Enabling cursor highlighter...");
+    debugLog("[Hati] Enabling cursor highlighter...");
 
     await initShaders(this.path);
 
@@ -79,11 +80,11 @@ export default class HatiExtension extends Extension {
 
     this._createHighlightActor();
 
-    console.log("[Hati] Enabled successfully");
+    debugLog("[Hati] Enabled successfully");
   }
 
   disable() {
-    console.log("[Hati] Disabling cursor highlighter...");
+    debugLog("[Hati] Disabling cursor highlighter...");
 
     if (this._indicator) {
       this._indicator.destroy();
@@ -109,7 +110,7 @@ export default class HatiExtension extends Extension {
       this._interfaceSettings = null;
     }
 
-    console.log("[Hati] Disabled successfully");
+    debugLog("[Hati] Disabled successfully");
   }
 
   _createHighlightActor() {

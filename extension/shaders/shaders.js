@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Gio from "gi://Gio";
+import { debugLog } from "../debug.js";
 
 let _shaderCache = {};
 let _loadedShaders = {};
@@ -81,7 +82,7 @@ export async function initShaders(extensionPath) {
     code: spotlightCode,
   };
 
-  console.log("[Hati Shaders] All shaders initialized");
+  debugLog("[Hati Shaders] All shaders initialized");
 }
 
 /**

@@ -6,6 +6,7 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 import { MagnifierClipEffect } from "../shaders/magnifier-clip-effect.js";
 import { SceneCloner } from "./scene-cloner.js";
+import { DEBUG, debugLog } from "../debug.js";
 
 // key symbol mapping
 const KEY_MAP = {
@@ -173,7 +174,7 @@ export class Magnifier {
       return;
     }
 
-    console.log("[Hati] Magnifier ACTIVATED");
+    debugLog("[Hati] Magnifier ACTIVATED");
     this._active = true;
 
     this._group.remove_all_transitions();
@@ -218,7 +219,7 @@ export class Magnifier {
   deactivate() {
     if (!this._active || !this._group) return;
 
-    console.log("[Hati] Magnifier DEACTIVATED");
+    debugLog("[Hati] Magnifier DEACTIVATED");
     this._active = false;
 
     this._group.remove_all_transitions();
@@ -260,7 +261,10 @@ export class Magnifier {
     const magnifierRadius = Math.round(maxRadiusPx * (cornerRadius / 50.0));
 
     // debug logging
-    if (!this._lastLogTime || Date.now() - this._lastLogTime > 2000) {
+    if (
+      DEBUG &&
+      (!this._lastLogTime || Date.now() - this._lastLogTime > 2000)
+    ) {
       console.log(
         `[Hati Magnifier] size=${size}, diameter=${magnifierDiameter}`,
       );
