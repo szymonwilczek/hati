@@ -1,38 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Szymon Wilczek
 
-import Cogl from "gi://Cogl";
 import GObject from "gi://GObject";
-import Shell from "gi://Shell";
 
+import { GLSLEffect } from "./glsl-effect.js";
 import { getShaderDeclarations, getShaderCode } from "./shaders.js";
 
 export const MagnifierClipEffect = GObject.registerClass(
   {},
-  class MagnifierClipEffect extends Shell.GLSLEffect {
-    _init() {
-      super._init();
-      this._boundsLoc = this.get_uniform_location("bounds");
-      this._clipRadiusLoc = this.get_uniform_location("clipRadius");
-      this._pixelStepLoc = this.get_uniform_location("pixelStep");
-    }
-
-    vfunc_build_pipeline() {
-      this.add_glsl_snippet(
-        Cogl.SnippetHook.FRAGMENT,
-        getShaderDeclarations("magnifier-clip"),
-        getShaderCode("magnifier-clip"),
-        false,
-      );
+  class MagnifierClipEffect extends GLSLEffect {
+    getSnippetSource() {
+      return {
+        declarations: getShaderDeclarations("magnifier-clip"),
+        code: getShaderCode("magnifier-clip"),
+        replace: false,
+      };
     }
 
     updateUniforms(width, height, cornerRadius) {
       const pixelStep = [1.0 / width, 1.0 / height];
       const bounds = [0, 0, width, height];
 
-      this.set_uniform_float(this._boundsLoc, 4, bounds);
-      this.set_uniform_float(this._clipRadiusLoc, 1, [cornerRadius]);
-      this.set_uniform_float(this._pixelStepLoc, 2, pixelStep);
+      this.setUniformFloat("bounds", 4, bounds);
+      this.setUniformFloat("clipRadius", 1, [cornerRadius]);
+      this.setUniformFloat("pixelStep", 2, pixelStep);
       this.queue_repaint();
     }
   },
