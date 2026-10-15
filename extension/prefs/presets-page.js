@@ -256,7 +256,7 @@ export const PresetsPage = GObject.registerClass(
             try {
               const jsonString = JSON.stringify(preset, null, 2);
               file.replace_contents_async(
-                jsonString,
+                new TextEncoder().encode(jsonString),
                 null,
                 false,
                 Gio.FileCreateFlags.NONE,
