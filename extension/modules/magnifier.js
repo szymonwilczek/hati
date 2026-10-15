@@ -21,6 +21,25 @@ const KEY_MAP = {
   Super_R: Clutter.KEY_Super_R,
 };
 
+const CONFIG_KEYS = [
+  "magnifier-enabled",
+  "magnifier-key",
+  "magnifier-zoom",
+  "size",
+  "border-weight",
+  "corner-radius",
+  "rotation",
+];
+
+function activationMaskFor(key) {
+  if (key.includes("Shift")) return Clutter.ModifierType.SHIFT_MASK;
+  if (key.includes("Control")) return Clutter.ModifierType.CONTROL_MASK;
+  if (key.includes("Alt")) return Clutter.ModifierType.MOD1_MASK;
+  if (key.includes("Super"))
+    return Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.SUPER_MASK;
+  return Clutter.ModifierType.SHIFT_MASK;
+}
+
 export class Magnifier {
   constructor(settings, physics) {
     this._settings = settings;
@@ -33,6 +52,25 @@ export class Magnifier {
     this._keyPressed = false;
     this._unredirectDisabled = false;
     this._lastLogTime = null;
+    this._config = null;
+    this._readConfig();
+    this._settingsChangedId = this._settings.connect("changed", (_s, key) => {
+      if (CONFIG_KEYS.includes(key)) this._readConfig();
+    });
+  }
+
+  _readConfig() {
+    const key = this._settings.get_string("magnifier-key") || "Shift_L";
+    this._config = {
+      enabled: this._settings.get_boolean("magnifier-enabled"),
+      keySymbol: KEY_MAP[key] || Clutter.KEY_Shift_L,
+      activationMask: activationMaskFor(key),
+      size: this._settings.get_int("size") || 100,
+      zoom: this._settings.get_double("magnifier-zoom") || 2.0,
+      borderWeight: this._settings.get_int("border-weight") || 4,
+      cornerRadius: this._settings.get_int("corner-radius") || 50,
+      rotation: this._settings.get_int("rotation") || 0,
+    };
   }
 
   /**
@@ -61,6 +99,11 @@ export class Magnifier {
    * Destroy magnifier and clean up resources
    */
   destroy() {
+    if (this._settingsChangedId) {
+      this._settings.disconnect(this._settingsChangedId);
+      this._settingsChangedId = null;
+    }
+
     this._cleanupResources();
     this._setUnredirect(true);
 
@@ -91,15 +134,7 @@ export class Magnifier {
    * Get activation mask based on settings
    */
   getActivationMask() {
-    const key = this._settings.get_string("magnifier-key") || "Shift_L";
-    if (key.includes("Shift")) return Clutter.ModifierType.SHIFT_MASK;
-    if (key.includes("Control")) return Clutter.ModifierType.CONTROL_MASK;
-    if (key.includes("Alt")) return Clutter.ModifierType.MOD1_MASK;
-    if (key.includes("Super"))
-      return (
-        Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.SUPER_MASK
-      );
-    return Clutter.ModifierType.SHIFT_MASK;
+    return this._config.activationMask;
   }
 
   /**
@@ -115,12 +150,7 @@ export class Magnifier {
       return false;
     }
 
-    const activationKey =
-      this._settings.get_string("magnifier-key") || "Shift_L";
-    const keyName = event.get_key_symbol();
-    const targetKey = KEY_MAP[activationKey] || Clutter.KEY_Shift_L;
-
-    if (keyName !== targetKey) {
+    if (event.get_key_symbol() !== this._config.keySymbol) {
       return false;
     }
 
@@ -142,7 +172,7 @@ export class Magnifier {
    * @param {number} mask - Current modifier mask
    */
   pollActivation(mask) {
-    if (!this._settings.get_boolean("magnifier-enabled")) {
+    if (!this._config.enabled) {
       if (this._active) {
         this.deactivate();
       }
@@ -164,7 +194,7 @@ export class Magnifier {
    */
   activate() {
     if (!this._group) return;
-    if (!this._settings.get_boolean("magnifier-enabled")) return;
+    if (!this._config.enabled) return;
 
     const isInterruptedExit = this._group.visible && this._group.opacity > 0;
     if (this._active && !isInterruptedExit) {
@@ -248,11 +278,7 @@ export class Magnifier {
   update(curX, curY) {
     if (!this._group || !this._active) return;
 
-    const size = this._settings.get_int("size") || 100;
-    const zoom = this._settings.get_double("magnifier-zoom") || 2.0;
-    const borderWeight = this._settings.get_int("border-weight") || 4;
-    const cornerRadius = this._settings.get_int("corner-radius") || 50;
-    const rotation = this._settings.get_int("rotation") || 0;
+    const { size, zoom, borderWeight, cornerRadius, rotation } = this._config;
 
     // calculate magnifier size
     const outerHalf = size / 2;

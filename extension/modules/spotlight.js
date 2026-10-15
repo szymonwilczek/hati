@@ -7,6 +7,17 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { getShapeValue } from "../utils.js";
 import { SpotlightEffect } from "../shaders/spotlight-effect.js";
 
+const KEY_MASKS = {
+  Shift_L: Clutter.ModifierType.SHIFT_MASK,
+  Shift_R: Clutter.ModifierType.SHIFT_MASK,
+  Control_L: Clutter.ModifierType.CONTROL_MASK,
+  Control_R: Clutter.ModifierType.CONTROL_MASK,
+  Alt_L: Clutter.ModifierType.MOD1_MASK,
+  Alt_R: Clutter.ModifierType.MOD1_MASK,
+  Super_L: Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.SUPER_MASK,
+  Super_R: Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.SUPER_MASK,
+};
+
 export class Spotlight {
   constructor(settings) {
     this._settings = settings;
@@ -112,18 +123,7 @@ export class Spotlight {
   pollActivation(mask) {
     if (!this._enabled) return;
 
-    const keyMap = {
-      Shift_L: Clutter.ModifierType.SHIFT_MASK,
-      Shift_R: Clutter.ModifierType.SHIFT_MASK,
-      Control_L: Clutter.ModifierType.CONTROL_MASK,
-      Control_R: Clutter.ModifierType.CONTROL_MASK,
-      Alt_L: Clutter.ModifierType.MOD1_MASK,
-      Alt_R: Clutter.ModifierType.MOD1_MASK,
-      Super_L: Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.SUPER_MASK,
-      Super_R: Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.SUPER_MASK,
-    };
-
-    const targetMask = keyMap[this._key];
+    const targetMask = KEY_MASKS[this._key];
     const isPressed = (mask & targetMask) !== 0;
 
     if (isPressed && !this._active) {
