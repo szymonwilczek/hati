@@ -19,7 +19,7 @@ import {
   buildDrawSettings,
   calculateCanvasSize,
 } from "./modules/style-manager.js";
-import { Physics } from "./modules/physics.js";
+import { Physics, STEP_MS } from "./modules/physics.js";
 import { Glow } from "./modules/glow.js";
 import { getAnimation } from "./animations/animations.js";
 import { renderHighlight } from "./modules/highlight-renderer.js";
@@ -145,7 +145,6 @@ export default class HatiExtension extends Extension {
     this._innerRing = null;
 
     this._physics = new Physics(this._settings);
-    this._tickId = 0;
 
     this._glow = new Glow(this._settings);
 
@@ -178,11 +177,68 @@ export default class HatiExtension extends Extension {
       global.compositor.enable_unredirect(),
     );
 
-    // start physics
-    this._tickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
-      this._tick();
-      return GLib.SOURCE_CONTINUE;
+    // start physics, driven by the frame clock of the monitor the highlight
+    // is on, so every frame gets a fresh position at any refresh rate
+    this._timeline = new Clutter.Timeline({
+      actor: this._containerActor,
+      duration: 1000,
+      repeat_count: -1,
     });
+    this._timeline.connect("new-frame", (timeline) => {
+      this._tick(timeline.get_delta());
+    });
+    this._lastPointer = null;
+
+    // timeline pauses while nothing moves
+    this._cursorTracker = global.backend.get_cursor_tracker();
+    this._cursorMovedId = this._cursorTracker.connect(
+      "position-invalidated",
+      () => this._wake(),
+    );
+    this._wake();
+  }
+
+  _wake() {
+    if (!this._timeline || this._timeline.is_playing()) return;
+
+    if (this._idlePollId) {
+      GLib.source_remove(this._idlePollId);
+      this._idlePollId = null;
+    }
+    this._timeline.start();
+  }
+
+  _pause() {
+    this._timeline.stop();
+
+    // button presses and modifier changes dont move the pointer,
+    // and over client windows the stage sees no event for them,
+    // so poll for those
+    this._idlePollId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
+      const [x, y, mask] = global.get_pointer();
+      const [lastX, lastY, lastMask] = this._lastPointer;
+      if (x === lastX && y === lastY && mask === lastMask)
+        return GLib.SOURCE_CONTINUE;
+
+      this._idlePollId = null;
+      this._wake();
+      return GLib.SOURCE_REMOVE;
+    });
+  }
+
+  _isSettled(pointerX, pointerY, mask) {
+    const last = this._lastPointer;
+    return (
+      last !== null &&
+      last[0] === pointerX &&
+      last[1] === pointerY &&
+      last[2] === mask &&
+      this._physics.isSettled(pointerX, pointerY) &&
+      !this._clickState.active &&
+      !this._rgbEnabled &&
+      !this._magnifier?.isActive() &&
+      (!this._autoHide || this._autoHide.isSettled())
+    );
   }
 
   _updatePhysicsConstants() {
@@ -193,9 +249,20 @@ export default class HatiExtension extends Extension {
 
   _removeHighlightActor() {
     if (this._containerActor) {
-      if (this._tickId) {
-        GLib.source_remove(this._tickId);
-        this._tickId = 0;
+      if (this._cursorMovedId) {
+        this._cursorTracker.disconnect(this._cursorMovedId);
+        this._cursorMovedId = null;
+        this._cursorTracker = null;
+      }
+
+      if (this._idlePollId) {
+        GLib.source_remove(this._idlePollId);
+        this._idlePollId = null;
+      }
+
+      if (this._timeline) {
+        this._timeline.stop();
+        this._timeline = null;
       }
 
       // disconnect stage event handler
@@ -244,13 +311,16 @@ export default class HatiExtension extends Extension {
 
   // magnifier: key event handler
   _onStageEvent(event) {
-    if (this._magnifier) this._magnifier.handleKeyEvent(event);
+    if (this._magnifier && this._magnifier.handleKeyEvent(event)) this._wake();
     return Clutter.EVENT_PROPAGATE;
   }
 
-  _tick() {
-    if (!this._containerActor || !this._highlightActor)
-      return Clutter.TICK_STOP;
+  /**
+   * Per-frame update
+   * @param {number} deltaMs - Time since the previous frame in ms
+   */
+  _tick(deltaMs) {
+    if (!this._containerActor || !this._highlightActor) return;
 
     const [pointerX, pointerY, mask] = global.get_pointer();
     const containerWidth = this._containerActor.get_width();
@@ -260,7 +330,7 @@ export default class HatiExtension extends Extension {
       this._magnifier.pollActivation(mask);
     }
 
-    const [curX, curY] = this._physics.update(pointerX, pointerY);
+    const [curX, curY] = this._physics.update(pointerX, pointerY, deltaMs);
 
     if (this._magnifier) {
       this._magnifier.update(curX, curY);
@@ -272,7 +342,7 @@ export default class HatiExtension extends Extension {
     const anyPressed = leftPressed || rightPressed;
 
     if (this._autoHide) {
-      this._autoHide.update(curX, curY, anyPressed, 16);
+      this._autoHide.update(curX, curY, anyPressed, deltaMs);
     }
 
     if (this._spotlight) {
@@ -311,7 +381,7 @@ export default class HatiExtension extends Extension {
 
     // animate progress
     if (this._clickState.active) {
-      const speed = 0.15;
+      const speed = (0.15 * deltaMs) / STEP_MS;
 
       if (!this._clickState.closing) {
         if (this._clickState.progress < 1.0) {
@@ -359,7 +429,9 @@ export default class HatiExtension extends Extension {
       }
     }
 
-    return Clutter.TICK_CONTINUE;
+    const settled = this._isSettled(pointerX, pointerY, mask);
+    this._lastPointer = [pointerX, pointerY, mask];
+    if (settled) this._pause();
   }
 
   /**
@@ -421,6 +493,8 @@ export default class HatiExtension extends Extension {
   }
 
   _onSettingsChanged(key) {
+    this._wake();
+
     if (key === "show-indicator") {
       this._syncIndicator();
       return;
