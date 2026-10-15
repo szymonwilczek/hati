@@ -18,6 +18,8 @@ export class SceneCloner {
 
     // timing
     this._lastWindowRebuild = null;
+    this._needsRebuild = false;
+    this._restackedId = null;
   }
 
   /**
@@ -27,12 +29,23 @@ export class SceneCloner {
     this._createBackgroundClone();
     this._rebuildWindowClones();
     this._createPanelClone();
+
+    // rebuild on the next frame after a restack instead of waiting for
+    // the periodic rebuild, so a raised window shows up immediately
+    this._restackedId = global.display.connect("restacked", () => {
+      this._needsRebuild = true;
+    });
   }
 
   /**
    * Destroy all clones and clean up resources
    */
   destroy() {
+    if (this._restackedId) {
+      global.display.disconnect(this._restackedId);
+      this._restackedId = null;
+    }
+
     if (this._bgClone) {
       this._contentGroup.remove_child(this._bgClone);
       this._bgClone.destroy();
@@ -66,11 +79,13 @@ export class SceneCloner {
     // periodically rebuild window clones (every 500ms)
     if (
       rebuildWindows ||
+      this._needsRebuild ||
       !this._lastWindowRebuild ||
       Date.now() - this._lastWindowRebuild > 500
     ) {
       this._rebuildWindowClones();
       this._lastWindowRebuild = Date.now();
+      this._needsRebuild = false;
     }
 
     // transform all clones
@@ -158,37 +173,23 @@ export class SceneCloner {
     });
     this._windowClones = [];
 
-    // get windows from active workspace
-    let windows = [];
+    let actors = [];
+    let workspace = null;
     try {
-      const workspace = global.workspace_manager.get_active_workspace();
-      windows = workspace.list_windows();
+      actors = global.get_window_actors();
+      workspace = global.workspace_manager.get_active_workspace();
     } catch (e) {
       console.log(`[Hati SceneCloner] Failed to get windows: ${e}`);
       return;
     }
 
-    // sort by stacking order
-    try {
-      windows.sort((a, b) => {
-        const actorA = a.get_compositor_private();
-        const actorB = b.get_compositor_private();
-        if (!actorA || !actorB) return 0;
-        const indexA = global.window_group.get_child_index(actorA);
-        const indexB = global.window_group.get_child_index(actorB);
-        return indexA - indexB;
-      });
-    } catch (e) {
-      // continue with unsorted windows
-    }
-
     // clone each visible window (including popups and transients)
-    for (const win of windows) {
+    for (const actor of actors) {
       try {
-        if (win.is_hidden() || win.minimized) continue;
-
-        const actor = win.get_compositor_private();
-        if (!actor || !actor.visible) continue;
+        const win = actor.meta_window;
+        if (!win || win.is_hidden() || win.minimized) continue;
+        if (!win.located_on_workspace(workspace)) continue;
+        if (!actor.visible) continue;
 
         const clone = new Clutter.Clone({
           source: actor,
