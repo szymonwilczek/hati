@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Szymon Wilczek
+
 .PHONY: all install-extension clean package deploy-remote
 
 EXTENSION_UUID = hati@szymonwilczek.github.io

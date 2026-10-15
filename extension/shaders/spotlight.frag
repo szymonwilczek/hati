@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Szymon Wilczek
+
 float aa = 1.0; // anty-aliasing width
 vec2 p = cogl_tex_coord0_in.xy * u_resolution; // current pixel coordinates
 float dist = getDist(p);

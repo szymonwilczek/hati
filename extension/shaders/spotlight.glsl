@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Szymon Wilczek
+
 uniform vec2 u_pos;
 uniform float u_size;
 uniform float u_opacity;

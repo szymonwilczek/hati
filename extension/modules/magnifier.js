@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Szymon Wilczek
 
 import Clutter from "gi://Clutter";
 import St from "gi://St";
