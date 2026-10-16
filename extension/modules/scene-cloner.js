@@ -80,43 +80,87 @@ export class SceneCloner {
    * @param {boolean} rebuildWindows - Whether to rebuild window clones
    */
   update(curX, curY, zoom, diameter, rebuildWindows = false) {
-    // periodically rebuild window clones (every 500ms)
+    // periodically re-check the window set (every 500ms),
+    // clones are only recreated when it actually changed
     if (
       rebuildWindows ||
       this._needsRebuild ||
       !this._lastWindowRebuild ||
       Date.now() - this._lastWindowRebuild > 500
     ) {
-      this._rebuildWindowClones();
+      this._syncWindowClones();
       this._lastWindowRebuild = Date.now();
       this._needsRebuild = false;
     }
 
     // transform all clones
-    const allLayers = [
-      ...this._windowClones,
-      this._bgClone,
-      this._panelClone,
-    ].filter((x) => x);
+    for (const clone of this._windowClones)
+      this._transformClone(clone, curX, curY, zoom, diameter);
+    if (this._bgClone)
+      this._transformClone(this._bgClone, curX, curY, zoom, diameter);
+    if (this._panelClone)
+      this._transformClone(this._panelClone, curX, curY, zoom, diameter);
+  }
 
-    allLayers.forEach((clone) => {
-      if (!clone) return;
+  _transformClone(clone, curX, curY, zoom, diameter) {
+    let sourceX = 0;
+    let sourceY = 0;
 
-      let sourceX = 0;
-      let sourceY = 0;
+    if (clone._sourceActor) {
+      sourceX = clone._sourceActor.x;
+      sourceY = clone._sourceActor.y;
+    }
 
-      if (clone._sourceActor) {
-        sourceX = clone._sourceActor.x;
-        sourceY = clone._sourceActor.y;
+    clone.set_scale(zoom, zoom);
+    clone.set_translation(
+      diameter / 2 - (curX - sourceX) * zoom,
+      diameter / 2 - (curY - sourceY) * zoom,
+      0,
+    );
+  }
+
+  /**
+   * Window actors that should be visible in the magnifier, bottom to top
+   * @returns {Array|null} - null if the window list could not be read
+   */
+  _visibleWindowActors() {
+    let actors = [];
+    let workspace = null;
+    try {
+      actors = global.get_window_actors();
+      workspace = global.workspace_manager.get_active_workspace();
+    } catch (e) {
+      debugLog(`[Hati SceneCloner] Failed to get windows: ${e}`);
+      return null;
+    }
+
+    return actors.filter((actor) => {
+      try {
+        const win = actor.meta_window;
+        if (!win || win.is_hidden() || win.minimized) return false;
+        if (!win.located_on_workspace(workspace)) return false;
+        return actor.visible;
+      } catch (e) {
+        debugLog(`[Hati SceneCloner] Skipping window: ${e.message}`);
+        return false;
       }
-
-      clone.set_scale(zoom, zoom);
-      clone.set_translation(
-        diameter / 2 - (curX - sourceX) * zoom,
-        diameter / 2 - (curY - sourceY) * zoom,
-        0,
-      );
     });
+  }
+
+  /**
+   * Rebuild window clones only if the visible windows or their stacking
+   * order changed since the last rebuild
+   */
+  _syncWindowClones() {
+    const actors = this._visibleWindowActors();
+    if (!actors) return;
+
+    const unchanged =
+      actors.length === this._windowClones.length &&
+      actors.every((actor, i) => this._windowClones[i]._sourceActor === actor);
+    if (unchanged) return;
+
+    this._rebuildWindowClones(actors);
   }
 
   _createBackgroundClone() {
@@ -156,7 +200,7 @@ export class SceneCloner {
     }
   }
 
-  _rebuildWindowClones() {
+  _rebuildWindowClones(actors = this._visibleWindowActors()) {
     if (!this._contentGroup) return;
 
     // clean up old clones
@@ -171,25 +215,10 @@ export class SceneCloner {
       }
     });
     this._windowClones = [];
+    if (!actors) return;
 
-    let actors = [];
-    let workspace = null;
-    try {
-      actors = global.get_window_actors();
-      workspace = global.workspace_manager.get_active_workspace();
-    } catch (e) {
-      debugLog(`[Hati SceneCloner] Failed to get windows: ${e}`);
-      return;
-    }
-
-    // clone each visible window (including popups and transients)
     for (const actor of actors) {
       try {
-        const win = actor.meta_window;
-        if (!win || win.is_hidden() || win.minimized) continue;
-        if (!win.located_on_workspace(workspace)) continue;
-        if (!actor.visible) continue;
-
         const clone = new Clutter.Clone({
           source: actor,
           reactive: false,
