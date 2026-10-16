@@ -230,6 +230,8 @@ export default class HatiExtension extends Extension {
         this._physics = null;
       }
 
+      this._rgbTint = null;
+      this._rgbTintColor = null;
       this._canvas = null;
       this._highlightActor = null;
       this._outerRing = null;
@@ -345,15 +347,56 @@ export default class HatiExtension extends Extension {
       const hue = (now * speed * 0.1) % 360;
       const rgb = hslToRgb(hue, 1.0, 0.5);
 
-      this._drawSettings.color.red = rgb.red;
-      this._drawSettings.color.green = rgb.green;
-      this._drawSettings.color.blue = rgb.blue;
-      this._drawSettings.color.alpha = 1.0;
-
-      this._canvas.queue_repaint();
+      if (this._clickState.active) {
+        this._setRgbTint(false);
+        this._setDrawColor(rgb.red, rgb.green, rgb.blue);
+        this._canvas.queue_repaint();
+      } else {
+        this._setRgbTint(true);
+        this._rgbTintColor.red = rgb.red;
+        this._rgbTintColor.green = rgb.green;
+        this._rgbTintColor.blue = rgb.blue;
+        this._rgbTint.set_tint(this._rgbTintColor);
+      }
     }
 
     return Clutter.TICK_CONTINUE;
+  }
+
+  /**
+   * Switch between recoloring the highlight on the GPU and drawing the color
+   * into the canvas. With the tint on, the canvas holds a white highlight
+   * and only the effect's uniform changes each frame, so the hue animation
+   * needs no Cairo redraw.
+   * @param {boolean} enabled
+   */
+  _setRgbTint(enabled) {
+    if (enabled === !!this._rgbTint) return;
+
+    if (enabled) {
+      this._rgbTintColor = new Cogl.Color({
+        red: 255,
+        green: 255,
+        blue: 255,
+        alpha: 255,
+      });
+      this._rgbTint = new Clutter.ColorizeEffect({ tint: this._rgbTintColor });
+      this._canvas.add_effect(this._rgbTint);
+      this._setDrawColor(255, 255, 255);
+    } else {
+      this._canvas.remove_effect(this._rgbTint);
+      this._rgbTint = null;
+      this._rgbTintColor = null;
+    }
+    this._canvas.queue_repaint();
+  }
+
+  _setDrawColor(red, green, blue) {
+    const color = this._drawSettings.color;
+    color.red = red;
+    color.green = green;
+    color.blue = blue;
+    color.alpha = 1.0;
   }
 
   _toggleHighlight() {
@@ -422,6 +465,9 @@ export default class HatiExtension extends Extension {
       interfaceSettings: this._interfaceSettings,
       glow: this._glow,
     });
+
+    if (!this._rgbEnabled) this._setRgbTint(false);
+    else if (this._rgbTint) this._setDrawColor(255, 255, 255);
 
     const totalSize = calculateCanvasSize(this._drawSettings.size, this._glow);
 
