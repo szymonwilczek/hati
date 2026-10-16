@@ -45,6 +45,13 @@ export class AutoHide {
   }
 
   /**
+   * Whether it has nothing left to time while the cursor stays still
+   */
+  isSettled() {
+    return this._hidden || !this._enabled;
+  }
+
+  /**
    * Update auto-hide state (called every tick)
    * @param {number} curX - Current cursor X
    * @param {number} curY - Current cursor Y
