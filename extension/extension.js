@@ -219,6 +219,7 @@ export default class HatiExtension extends Extension {
       }
 
       if (this._autoHide) {
+        this._autoHide.destroy();
         this._autoHide = null;
       }
 

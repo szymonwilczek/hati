@@ -17,6 +17,24 @@ export class AutoHide {
     this._lastX = 0;
     this._lastY = 0;
     this._stationaryTime = 0;
+
+    // read once and kept in sync, update() runs every tick
+    this._readConfig();
+    this._settingsChangedId = this._settings.connect("changed", (_s, key) => {
+      if (key === "auto-hide" || key === "auto-hide-delay") this._readConfig();
+    });
+  }
+
+  _readConfig() {
+    this._enabled = this._settings.get_boolean("auto-hide");
+    this._delay = this._settings.get_int("auto-hide-delay");
+  }
+
+  destroy() {
+    if (this._settingsChangedId) {
+      this._settings.disconnect(this._settingsChangedId);
+      this._settingsChangedId = null;
+    }
   }
 
   /**
@@ -46,7 +64,7 @@ export class AutoHide {
       this._lastY = curY;
     }
 
-    if (!this._settings.get_boolean("auto-hide")) {
+    if (!this._enabled) {
       // auto-hide disabled, ensure visible
       if (this._hidden) {
         this._show();
@@ -63,8 +81,7 @@ export class AutoHide {
     } else {
       this._stationaryTime += deltaMs;
 
-      const delay = this._settings.get_int("auto-hide-delay");
-      if (!this._hidden && this._stationaryTime >= delay) {
+      if (!this._hidden && this._stationaryTime >= this._delay) {
         this._hide();
       }
     }
