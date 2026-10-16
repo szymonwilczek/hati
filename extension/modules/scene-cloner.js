@@ -111,12 +111,13 @@ export class SceneCloner {
       sourceY = clone._sourceActor.y;
     }
 
-    clone.set_scale(zoom, zoom);
-    clone.set_translation(
-      diameter / 2 - (curX - sourceX) * zoom,
-      diameter / 2 - (curY - sourceY) * zoom,
-      0,
-    );
+    const scale = Math.fround(zoom);
+    const tx = Math.fround(diameter / 2 - (curX - sourceX) * zoom);
+    const ty = Math.fround(diameter / 2 - (curY - sourceY) * zoom);
+    if (clone.scale_x !== scale || clone.scale_y !== scale)
+      clone.set_scale(scale, scale);
+    if (clone.translation_x !== tx || clone.translation_y !== ty)
+      clone.set_translation(tx, ty, 0);
   }
 
   /**
