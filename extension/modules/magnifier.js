@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Szymon Wilczek
 
 import Clutter from "gi://Clutter";
+import Shell from "gi://Shell";
 import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
@@ -91,6 +92,11 @@ export class Magnifier {
       height: 300,
     });
     this._group.add_child(this._contentGroup);
+
+    if (Shell.util_set_hidden_from_pick) {
+      Shell.util_set_hidden_from_pick(this._group, true);
+      Shell.util_set_hidden_from_pick(this._contentGroup, true);
+    }
 
     Main.layoutManager.addChrome(this._group);
   }
