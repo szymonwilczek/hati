@@ -138,6 +138,11 @@ export default class HatiExtension extends Extension {
       this._drawHighlight(area);
     });
 
+    if (Shell.util_set_hidden_from_pick) {
+      Shell.util_set_hidden_from_pick(this._containerActor, true);
+      Shell.util_set_hidden_from_pick(this._canvas, true);
+    }
+
     this._containerActor.add_child(this._canvas);
 
     this._highlightActor = this._canvas;

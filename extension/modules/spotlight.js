@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Szymon Wilczek
 
 import Clutter from "gi://Clutter";
+import Shell from "gi://Shell";
 import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { getShapeValue } from "../utils.js";
@@ -153,6 +154,10 @@ export class Spotlight {
       height: global.stage.height,
       opacity: 0,
     });
+
+    if (Shell.util_set_hidden_from_pick) {
+      Shell.util_set_hidden_from_pick(this._actor, true);
+    }
 
     this._effect = new SpotlightEffect();
     this._actor.add_effect(this._effect);
